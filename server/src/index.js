@@ -6,6 +6,9 @@ const app = express()
 
 app.use(express.json())
 
+const cors = require('cors')
+app.use(cors())
+
 app.use('/statuses', require('./api/routes/statuses'))
 app.use('/locations', require('./api/routes/locations'))
 app.use('/items', require('./api/routes/items'))
