@@ -1,0 +1,33 @@
+CREATE TABLE statuses (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE locations (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE items (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  invoice_name VARCHAR(255),
+  unit VARCHAR(50) NOT NULL,
+  counted INTEGER NOT NULL DEFAULT 0,
+  available INTEGER NOT NULL DEFAULT 0,
+  total_quantity INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  report TEXT,
+  journal_entry TEXT,
+  status_id INTEGER REFERENCES statuses(id) ON DELETE SET NULL,
+  location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE units (
+  id SERIAL PRIMARY KEY,
+  serial_number VARCHAR(255),
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW()
+);

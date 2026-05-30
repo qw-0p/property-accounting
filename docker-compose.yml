@@ -1,0 +1,31 @@
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    container_name: property-accounting-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: property_accounting
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: property-accounting-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: 'postgresql://admin:admin@db:5432/property_accounting'
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
