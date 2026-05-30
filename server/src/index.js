@@ -6,6 +6,11 @@ const app = express()
 
 app.use(express.json())
 
+app.use('/statuses', require('./api/routes/statuses'))
+app.use('/locations', require('./api/routes/locations'))
+app.use('/items', require('./api/routes/items'))
+app.use('/items/:item_id/units', require('./api/routes/units'))
+
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')

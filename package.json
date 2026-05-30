@@ -1,23 +1,8 @@
 {
-  "name": "property_accounting",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
-    "migrate": "node src/database/migrate.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.30.2",
-  "dependencies": {
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "pg": "^8.21.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
+	"name": "property-accounting",
+	"private": true,
+	"scripts": {
+		"dev": "pnpm --filter server dev",
+		"migrate": "pnpm --filter server migrate"
+	}
 }
