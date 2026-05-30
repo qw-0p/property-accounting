@@ -9,9 +9,11 @@ app.use(express.json())
 const cors = require('cors')
 app.use(cors())
 
+app.use('/services', require('./api/routes/services'))
 app.use('/statuses', require('./api/routes/statuses'))
 app.use('/locations', require('./api/routes/locations'))
 app.use('/items', require('./api/routes/items'))
+app.use('/units', require('./api/routes/units_standalone'))
 app.use('/items/:item_id/units', require('./api/routes/units'))
 
 app.get('/health', async (req, res) => {

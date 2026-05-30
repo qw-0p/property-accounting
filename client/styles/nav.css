@@ -1,0 +1,44 @@
+/* client/styles/nav.css */
+nav {
+	width: 240px;
+	min-width: 240px;
+	background: #1e293b;
+	color: #fff;
+	padding: 20px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow-y: auto;
+}
+
+nav .nav-title {
+	font-size: 11px;
+	color: #64748b;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	padding: 16px 12px 6px;
+	font-weight: 600;
+}
+
+nav a {
+	color: #94a3b8;
+	text-decoration: none;
+	padding: 8px 12px;
+	border-radius: 6px;
+	display: block;
+	font-size: 13px;
+	font-weight: 500;
+	transition:
+		background 0.15s,
+		color 0.15s;
+}
+
+nav a:hover {
+	background: #334155;
+	color: #e2e8f0;
+}
+
+nav a.active {
+	background: #2563eb;
+	color: #fff;
+}

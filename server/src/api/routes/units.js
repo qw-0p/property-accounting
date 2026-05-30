@@ -19,4 +19,9 @@ router.delete('/:id', async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+router.patch('/:id', async (req, res, next) => {
+  try {
+    res.json(await service.update(req.params.id, req.body))
+  } catch (e) { next(e) }
+})
 module.exports = router

@@ -1,0 +1,57 @@
+/* client/styles/form.css */
+.dict-add {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 16px;
+	align-items: center;
+}
+
+.dict-add input {
+	padding: 8px 12px;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	font-size: 13px;
+	width: 280px;
+	outline: none;
+}
+
+.dict-add input:focus {
+	border-color: #2563eb;
+}
+
+.dict-list {
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-width: 500px;
+}
+
+.dict-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: #fff;
+	padding: 10px 14px;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+}
+
+.dict-edit-input {
+	padding: 6px 10px;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	font-size: 13px;
+	width: 240px;
+	outline: none;
+}
+
+.dict-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.dict-actions button {
+	padding: 5px 10px;
+	font-size: 12px;
+}

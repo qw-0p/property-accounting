@@ -1,22 +1,17 @@
 const pool = require('../../database/db')
 
-const getAll = async ({ search, status_id, location_id, limit = 50, offset = 0 }) => {
+const getAll = async ({ search, service_id, limit = 50, offset = 0 } = {}) => {
   const conditions = []
   const values = []
   let i = 1
 
-  if (status_id) {
-    conditions.push(`i.status_id = $${i++}`)
-    values.push(status_id)
-  }
-
-  if (location_id) {
-    conditions.push(`i.location_id = $${i++}`)
-    values.push(location_id)
+  if (service_id) {
+    conditions.push(`i.service_id = $${i++}`)
+    values.push(service_id)
   }
 
   if (search) {
-    conditions.push(`(i.name ILIKE $${i} OR i.invoice_name ILIKE $${i} OR i.note ILIKE $${i})`)
+    conditions.push(`(i.name ILIKE $${i} OR i.invoice_name ILIKE $${i})`)
     values.push(`%${search}%`)
     i++
   }
@@ -24,13 +19,13 @@ const getAll = async ({ search, status_id, location_id, limit = 50, offset = 0 }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const { rows } = await pool.query(
-    `SELECT i.*, 
-      s.name AS status_name,
-      l.name AS location_name
+    `SELECT i.*,
+      COUNT(u.id) AS total_quantity,
+      COUNT(u.id) FILTER (WHERE u.available = true) AS available_quantity
     FROM items i
-    LEFT JOIN statuses s ON s.id = i.status_id
-    LEFT JOIN locations l ON l.id = i.location_id
+    LEFT JOIN units u ON u.item_id = i.id
     ${where}
+    GROUP BY i.id
     ORDER BY i.id DESC
     LIMIT $${i} OFFSET $${i + 1}`,
     [...values, limit, offset]
@@ -47,24 +42,24 @@ const getAll = async ({ search, status_id, location_id, limit = 50, offset = 0 }
 const getById = async (id) => {
   const { rows } = await pool.query(
     `SELECT i.*,
-      s.name AS status_name,
-      l.name AS location_name
+      COUNT(u.id) AS total_quantity,
+      COUNT(u.id) FILTER (WHERE u.available = true) AS available_quantity
     FROM items i
-    LEFT JOIN statuses s ON s.id = i.status_id
-    LEFT JOIN locations l ON l.id = i.location_id
-    WHERE i.id = $1`,
+    LEFT JOIN units u ON u.item_id = i.id
+    WHERE i.id = $1
+    GROUP BY i.id`,
     [id]
   )
   return rows[0]
 }
 
 const create = async (data) => {
-  const { name, invoice_name, unit, counted, available, total_quantity, note, report, journal_entry, status_id, location_id } = data
+  const { name, invoice_name, unit, service_id } = data
   const { rows } = await pool.query(
-    `INSERT INTO items (name, invoice_name, unit, counted, available, total_quantity, note, report, journal_entry, status_id, location_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `INSERT INTO items (name, invoice_name, unit, service_id)
+    VALUES ($1,$2,$3,$4)
     RETURNING *`,
-    [name, invoice_name, unit, counted ?? 0, available ?? 0, total_quantity ?? 0, note, report, journal_entry, status_id, location_id]
+    [name, invoice_name || null, unit, service_id || null]
   )
   return rows[0]
 }
@@ -74,7 +69,7 @@ const update = async (id, data) => {
   const values = []
   let i = 1
 
-  const allowed = ['name', 'invoice_name', 'unit', 'counted', 'available', 'total_quantity', 'note', 'report', 'journal_entry', 'status_id', 'location_id']
+  const allowed = ['name', 'invoice_name', 'unit', 'service_id']
 
   for (const key of allowed) {
     if (data[key] !== undefined) {
@@ -85,7 +80,6 @@ const update = async (id, data) => {
 
   if (!fields.length) return null
 
-  fields.push(`updated_at = NOW()`)
   values.push(id)
 
   const { rows } = await pool.query(
