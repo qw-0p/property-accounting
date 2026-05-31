@@ -17,6 +17,7 @@ app.use('/locations', require('./api/routes/locations'))
 app.use('/items', require('./api/routes/items'))
 app.use('/units', require('./api/routes/units_standalone'))
 app.use('/items/:item_id/units', require('./api/routes/units'))
+app.use('/units-of-measure', require('./api/routes/units_of_measure'))
 
 app.get('/health', async (req, res) => {
   try {

@@ -22,7 +22,7 @@ const getById = async (id) => {
 
 const create = async (data) => {
   if (!data.name) throw { status: 400, message: 'Name is required' }
-  if (!data.unit) throw { status: 400, message: 'Unit is required' }
+  if (!data.unit_of_measure_id) throw { status: 400, message: 'Unit of measure is required' }
   return dal.create(data)
 }
 

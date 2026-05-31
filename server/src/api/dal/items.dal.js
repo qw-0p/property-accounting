@@ -31,12 +31,14 @@ const getAll = async ({ search, service_id, limit = 50, offset = 0 } = {}) => {
 
   const { rows } = await pool.query(
     `SELECT i.*,
+      uom.name AS unit_name,
       COUNT(u.id) AS total_quantity,
       COUNT(u.id) FILTER (WHERE u.available = true) AS available_quantity
     FROM items i
+    LEFT JOIN units_of_measure uom ON uom.id = i.unit_of_measure_id
     LEFT JOIN units u ON u.item_id = i.id
     ${where}
-    GROUP BY i.id
+    GROUP BY i.id, uom.name
     ORDER BY i.id DESC
     LIMIT $${i} OFFSET $${i + 1}`,
     [...values, limit, offset]
@@ -53,24 +55,26 @@ const getAll = async ({ search, service_id, limit = 50, offset = 0 } = {}) => {
 const getById = async (id) => {
   const { rows } = await pool.query(
     `SELECT i.*,
+      uom.name AS unit_name,
       COUNT(u.id) AS total_quantity,
       COUNT(u.id) FILTER (WHERE u.available = true) AS available_quantity
     FROM items i
+    LEFT JOIN units_of_measure uom ON uom.id = i.unit_of_measure_id
     LEFT JOIN units u ON u.item_id = i.id
     WHERE i.id = $1
-    GROUP BY i.id`,
+    GROUP BY i.id, uom.name`,
     [id]
   )
   return rows[0]
 }
 
 const create = async (data) => {
-  const { name, invoice_name, unit, service_id } = data
+  const { name, invoice_name, unit_of_measure_id, service_id } = data
   const { rows } = await pool.query(
-    `INSERT INTO items (name, invoice_name, unit, service_id)
+    `INSERT INTO items (name, invoice_name, unit_of_measure_id, service_id)
     VALUES ($1,$2,$3,$4)
     RETURNING *`,
-    [name, invoice_name || null, unit, service_id || null]
+    [name, invoice_name || null, unit_of_measure_id, service_id || null]
   )
   return rows[0]
 }
@@ -80,7 +84,7 @@ const update = async (id, data) => {
   const values = []
   let i = 1
 
-  const allowed = ['name', 'invoice_name', 'unit', 'service_id']
+  const allowed = ['name', 'invoice_name', 'unit_of_measure_id', 'service_id']
 
   for (const key of allowed) {
     if (data[key] !== undefined) {

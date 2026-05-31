@@ -9,6 +9,8 @@ export function ItemsPage({ serviceId } = {}) {
 	const servicesApi = dictApi('services')
 
 	let services = []
+	let unitsOfMeasure = []
+	const unitsOfMeasureApi = dictApi('units-of-measure')
   let items = []
   let total = 0
   let statuses = []
@@ -52,7 +54,7 @@ export function ItemsPage({ serviceId } = {}) {
                   </td>
                   <td>${item.name}</td>
                   <td>${item.invoice_name || '—'}</td>
-                  <td>${item.unit}</td>
+                  <td>${item.unit_name}</td>
                   <td>${item.total_quantity} (${item.available_quantity} в наявності)</td>
                   <td class="row-actions">
                     <button class="btn-ghost edit-btn" data-id="${item.id}">Ред.</button>
@@ -417,10 +419,13 @@ const renderAccordion = async (itemId, container) => {
 								${services.map(s => `<option value="${s.id}" ${item?.service_id == s.id || serviceId == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
 							</select>
 						</div>
-            <div class="form-group">
-              <label>Одиниця виміру *</label>
-              <input type="text" name="unit" value="${item?.unit || ''}" />
-            </div>
+						<div class="form-group">
+							<label>Одиниця виміру *</label>
+							<select name="unit_of_measure_id">
+								<option value="">— Оберіть</option>
+								${unitsOfMeasure.map(u => `<option value="${u.id}" ${item?.unit_of_measure_id == u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
+							</select>
+						</div>
           </div>
           <div class="modal-footer">
             <button class="btn-ghost modal-close">Скасувати</button>
@@ -488,10 +493,11 @@ const renderAccordion = async (itemId, container) => {
 	}
 
   const init = async () => {
-		;[statuses, locations, services] = await Promise.all([
+		;[statuses, locations, services, unitsOfMeasure] = await Promise.all([
 			statusesApi.getAll(),
 			locationsApi.getAll(),
 			servicesApi.getAll(),
+			unitsOfMeasureApi.getAll(),
 		])
 		load()
 	}

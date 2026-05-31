@@ -10,6 +10,7 @@ const routes = {
   '#/statuses': () => DictPage({ resource: 'statuses', title: 'Статуси' }),
   '#/locations': () => DictPage({ resource: 'locations', title: 'Локації' }),
   '#/services': () => DictPage({ resource: 'services', title: 'Служби' }),
+  '#/units-of-measure': () => DictPage({ resource: 'units-of-measure', title: 'Одиниці виміру' }),
 }
 
 const main = document.getElementById('main')
