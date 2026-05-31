@@ -42,3 +42,37 @@ nav a.active {
 	background: #2563eb;
 	color: #fff;
 }
+
+.nav-spacer {
+	flex: 1;
+}
+
+.nav-auth {
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	border: none;
+	width: 100%;
+	text-align: left;
+}
+
+.nav-auth-login {
+	background: #2563eb;
+	color: #fff;
+}
+
+.nav-auth-login:hover {
+	background: #1d4ed8;
+}
+
+.nav-auth-logout {
+	background: #334155;
+	color: #94a3b8;
+}
+
+.nav-auth-logout:hover {
+	background: #475569;
+	color: #fff;
+}

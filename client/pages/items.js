@@ -5,8 +5,10 @@ import { unitsApi } from '../api/units.js'
 export function ItemsPage({ serviceId } = {}) {
   const el = document.createElement('div')
   const statusesApi = dictApi('statuses')
-  const locationsApi = dictApi('locations')
+	const locationsApi = dictApi('locations')
+	const servicesApi = dictApi('services')
 
+	let services = []
   let items = []
   let total = 0
   let statuses = []
@@ -408,6 +410,13 @@ const renderAccordion = async (itemId, container) => {
               <label>Найменування згідно накладної</label>
               <input type="text" name="invoice_name" value="${item?.invoice_name || ''}" />
             </div>
+						<div class="form-group">
+							<label>Служба *</label>
+							<select name="service_id">
+								<option value="">- Оберіть службу</option>
+								${services.map(s => `<option value="${s.id}" ${item?.service_id == s.id || serviceId == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+							</select>
+						</div>
             <div class="form-group">
               <label>Одиниця виміру *</label>
               <input type="text" name="unit" value="${item?.unit || ''}" />
@@ -425,44 +434,67 @@ const renderAccordion = async (itemId, container) => {
       btn.onclick = () => { container.innerHTML = '' }
     })
 
-    container.querySelector('#modal-save').onclick = async () => {
-      const data = {}
-      container.querySelectorAll('[name]').forEach(input => {
-        data[input.name] = input.value === '' ? null : input.value
-      })
-      if (serviceId) data.service_id = serviceId
+		container.querySelector('#modal-save').onclick = async () => {
+			const data = {}
+			container.querySelectorAll('[name]').forEach(input => {
+				data[input.name] = input.value === '' ? null : input.value
+			})
 
-      if (item) {
-        await itemsApi.update(item.id, data)
-      } else {
-        await itemsApi.create(data)
-      }
+			if (!data.service_id) {
+				alert('Оберіть службу')
+				return
+			}
 
-      container.innerHTML = ''
-      load()
-    }
+			if (item) {
+				await itemsApi.update(item.id, data)
+			} else {
+				await itemsApi.create(data)
+			}
+
+			container.innerHTML = ''
+			load()
+		}
   }
 
   const load = async () => {
-    const params = {}
-    if (filters.search) params.search = filters.search
-    if (filters.service_id) params.service_id = filters.service_id
-    params.page = filters.page
-    params.limit = filters.limit
+		const params = {}
+		if (filters.search) params.search = filters.search
+		if (filters.service_id) params.service_id = filters.service_id
+		params.page = filters.page
+		params.limit = filters.limit
 
-    const result = await itemsApi.getAll(params)
-    items = result.items
-    total = result.total
-    render()
-  }
+		const result = await itemsApi.getAll(params)
+		items = result.items
+		total = result.total
+		render()
+
+		const searchInput = el.querySelector('#search')
+		if (filters.search && searchInput) {
+			searchInput.focus()
+			searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length)
+		}
+
+		if (filters.search) {
+			for (const item of items) {
+				openAccordions.add(item.id)
+				const row = el.querySelector(`#accordion-${item.id}`)
+				const content = el.querySelector(`#accordion-content-${item.id}`)
+				const trigger = el.querySelector(`.accordion-trigger[data-id="${item.id}"]`)
+				if (row) row.style.display = ''
+				if (trigger) trigger.textContent = '▼'
+				if (content) await renderAccordion(item.id, content)
+			}
+		}
+	}
 
   const init = async () => {
-    ;[statuses, locations] = await Promise.all([
-      statusesApi.getAll(),
-      locationsApi.getAll(),
-    ])
-    load()
-  }
+		;[statuses, locations, services] = await Promise.all([
+			statusesApi.getAll(),
+			locationsApi.getAll(),
+			servicesApi.getAll(),
+		])
+		load()
+	}
 
   init()
   return el

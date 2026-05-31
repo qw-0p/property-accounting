@@ -11,7 +11,18 @@ const getAll = async ({ search, service_id, limit = 50, offset = 0 } = {}) => {
   }
 
   if (search) {
-    conditions.push(`(i.name ILIKE $${i} OR i.invoice_name ILIKE $${i})`)
+    conditions.push(`(
+      i.name ILIKE $${i} OR 
+      i.invoice_name ILIKE $${i} OR
+      EXISTS (
+        SELECT 1 FROM units u 
+        WHERE u.item_id = i.id AND (
+          u.serial_number ILIKE $${i} OR
+          u.note ILIKE $${i} OR
+          u.report ILIKE $${i}
+        )
+      )
+    )`)
     values.push(`%${search}%`)
     i++
   }

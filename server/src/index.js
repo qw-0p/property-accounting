@@ -9,6 +9,8 @@ app.use(express.json())
 const cors = require('cors')
 app.use(cors())
 
+app.use('/auth', require('./api/routes/auth').router)
+app.use('/drive', require('./api/routes/drive'))
 app.use('/services', require('./api/routes/services'))
 app.use('/statuses', require('./api/routes/statuses'))
 app.use('/locations', require('./api/routes/locations'))
