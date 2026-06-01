@@ -69,12 +69,12 @@ const getById = async (id) => {
 }
 
 const create = async (data) => {
-  const { name, invoice_name, unit_of_measure_id, service_id, nomenclature_code } = data
+  const { name, invoice_name, unit_of_measure_id, service_id, nomenclature_code, price } = data
   const { rows } = await pool.query(
-    `INSERT INTO items (name, invoice_name, unit_of_measure_id, service_id, nomenclature_code)
-    VALUES ($1,$2,$3,$4,$5)
+    `INSERT INTO items (name, invoice_name, unit_of_measure_id, service_id, nomenclature_code, price)
+    VALUES ($1,$2,$3,$4,$5,$6)
     RETURNING *`,
-    [name, invoice_name || null, unit_of_measure_id, service_id || null, nomenclature_code || null]
+    [name, invoice_name || null, unit_of_measure_id, service_id || null, nomenclature_code || null, price || null]
   )
   return rows[0]
 }
@@ -84,7 +84,7 @@ const update = async (id, data) => {
   const values = []
   let i = 1
 
-  const allowed = ['name', 'invoice_name', 'unit_of_measure_id', 'service_id', 'nomenclature_code']
+  const allowed = ['name', 'invoice_name', 'unit_of_measure_id', 'service_id', 'nomenclature_code', 'price']
 
   for (const key of allowed) {
     if (data[key] !== undefined) {

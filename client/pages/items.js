@@ -43,6 +43,7 @@ export function ItemsPage({ serviceId } = {}) {
               <th>Од. виміру</th>
 							<th>КН</th>
               <th>Кількість</th>
+							<th>Ціна</th>
               <th></th>
             </tr>
           </thead>
@@ -59,6 +60,7 @@ export function ItemsPage({ serviceId } = {}) {
                   <td>${item.unit_name}</td>
 									<td>${item.nomenclature_code || '—'}</td>
                   <td>${item.total_quantity} (${item.available_quantity} в наявності)</td>
+									<td>${item.price || '—'}</td>
                   <td class="row-actions">
                     <button class="btn-ghost edit-btn" data-id="${item.id}">Ред.</button>
                     <button class="btn-danger delete-btn" data-id="${item.id}">Вид.</button>
@@ -336,95 +338,6 @@ const renderAccordion = async (itemId, container) => {
   renderRows(null)
 }
 
-  const openUnitModal = (unitId, itemId, container) => {
-    const modalContainer = document.getElementById('modal-container')
-    const units = container.querySelectorAll('tbody tr')
-    const row = container.querySelector(`tr[data-unit-id="${unitId}"]`)
-
-    modalContainer.innerHTML = `
-      <div class="modal-overlay">
-        <div class="modal">
-          <div class="modal-header">
-            <h2>Редагувати одиницю</h2>
-            <button class="btn-ghost modal-close">✕</button>
-          </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label>Серійний номер</label>
-              <input type="text" name="serial_number" value="${row?.cells[0].textContent === '—' ? '' : row?.cells[0].textContent || ''}" />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Статус</label>
-                <select name="status_id">
-                  <option value="">—</option>
-                  ${statuses.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Локація</label>
-                <select name="location_id">
-                  <option value="">—</option>
-                  ${locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Рахується</label>
-                <select name="counted">
-                  <option value="true">Так</option>
-                  <option value="false">Ні</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>В наявності</label>
-                <select name="available">
-                  <option value="true">Так</option>
-                  <option value="false">Ні</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Рапорт</label>
-              <input type="text" name="report" value="" />
-            </div>
-            <div class="form-group">
-              <label>Витяг з ЖБД</label>
-              <input type="text" name="journal_entry" value="" />
-            </div>
-            <div class="form-group">
-              <label>Примітка</label>
-              <textarea name="note" rows="3"></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-ghost modal-close">Скасувати</button>
-            <button class="btn-primary" id="unit-modal-save">Зберегти</button>
-          </div>
-        </div>
-      </div>
-    `
-
-    modalContainer.querySelectorAll('.modal-close').forEach(btn => {
-      btn.onclick = () => { modalContainer.innerHTML = '' }
-    })
-
-    modalContainer.querySelector('#unit-modal-save').onclick = async () => {
-      const data = {}
-      modalContainer.querySelectorAll('[name]').forEach(input => {
-        data[input.name] = input.value === '' ? null : input.value
-      })
-      data.counted = data.counted === 'true'
-      data.available = data.available === 'true'
-
-      await unitsApi.update(unitId, data)
-      modalContainer.innerHTML = ''
-      renderAccordion(itemId, container)
-      load()
-    }
-  }
-
   const openModal = (id = null) => {
     const item = id ? items.find(i => i.id === id) : null
     const container = document.getElementById('modal-container')
@@ -462,6 +375,10 @@ const renderAccordion = async (itemId, container) => {
 								<option value="">— Оберіть</option>
 								${unitsOfMeasure.map(u => `<option value="${u.id}" ${item?.unit_of_measure_id == u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
 							</select>
+						</div>
+						<div class="form-group">
+							<label>Ціна</label>
+							<input type="number" name="price" value="${item?.price || ''}" />
 						</div>
           </div>
           <div class="modal-footer">

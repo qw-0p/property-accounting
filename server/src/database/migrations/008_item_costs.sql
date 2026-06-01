@@ -1,0 +1,1 @@
+ALTER TABLE items ADD COLUMN price NUMERIC(12,2);
