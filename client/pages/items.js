@@ -1,6 +1,7 @@
 import { itemsApi } from '../api/items.js'
 import { dictApi } from '../api/dict.js'
 import { unitsApi } from '../api/units.js'
+import { DrivePicker } from '../components/drive-picker.js'
 
 export function ItemsPage({ serviceId } = {}) {
   const el = document.createElement('div')
@@ -184,8 +185,24 @@ const renderAccordion = async (itemId, container) => {
                   <option value="false" ${!u.available ? 'selected' : ''}>Ні</option>
                 </select>
               </td>
-              <td><input class="unit-inline-input" name="report" value="${u.report || ''}" /></td>
-              <td><input class="unit-inline-input" name="journal_entry" value="${u.journal_entry || ''}" /></td>
+							<td>
+								<div class="drive-field">
+									<input class="unit-inline-input" name="invoice" value="${u.invoice || ''}" placeholder="Посилання..." readonly />
+									<button class="btn-ghost drive-pick-btn" data-field="invoice" style="padding:4px 8px;font-size:11px">📁</button>
+								</div>
+							</td>
+              <td>
+								<div class="drive-field">
+									<input class="unit-inline-input" name="report" value="${u.report || ''}" placeholder="Посилання..." readonly />
+									<button class="btn-ghost drive-pick-btn" data-field="report" style="padding:4px 8px;font-size:11px">📁</button>
+								</div>
+							</td>
+							<td>
+								<div class="drive-field">
+									<input class="unit-inline-input" name="journal_entry" value="${u.journal_entry || ''}" placeholder="Посилання..." readonly />
+									<button class="btn-ghost drive-pick-btn" data-field="journal_entry" style="padding:4px 8px;font-size:11px">📁</button>
+								</div>
+							</td>
               <td><input class="unit-inline-input" name="note" value="${u.note || ''}" /></td>
               <td class="row-actions">
                 <button class="btn-primary unit-save-btn" data-id="${u.id}" data-item-id="${itemId}">Зберегти</button>
@@ -202,8 +219,9 @@ const renderAccordion = async (itemId, container) => {
             <td>${u.location_name || '—'}</td>
             <td>${u.counted ? '✓' : '✗'}</td>
             <td>${u.available ? '✓' : '✗'}</td>
-            <td>${u.report || '—'}</td>
-            <td>${u.journal_entry || '—'}</td>
+						<td>${u.invoice ? `<a href="${u.invoice}" target="_blank" style="color:#2563eb;font-size:12px">Відкрити</a>` : '—'}</td>
+						<td>${u.report ? `<a href="${u.report}" target="_blank" style="color:#2563eb;font-size:12px">Відкрити</a>` : '—'}</td>
+						<td>${u.journal_entry ? `<a href="${u.journal_entry}" target="_blank" style="color:#2563eb;font-size:12px">Відкрити</a>` : '—'}</td>
             <td>${u.note || '—'}</td>
             <td class="row-actions">
               <button class="btn-ghost unit-edit-btn" data-id="${u.id}">Ред.</button>
@@ -219,7 +237,19 @@ const renderAccordion = async (itemId, container) => {
 
     tbody.querySelectorAll('.unit-cancel-btn').forEach(btn => {
       btn.onclick = () => renderRows(null)
-    })
+		})
+
+		tbody.querySelectorAll('.drive-pick-btn').forEach(btn => {
+			btn.onclick = async () => {
+				const field = btn.dataset.field
+				const input = btn.closest('td').querySelector('input')
+				await DrivePicker({
+					field,
+					onSelect: ({ link }) => { input.value = link },
+					onClose: () => {}
+				})
+			}
+		})
 
     tbody.querySelectorAll('.unit-save-btn').forEach(btn => {
       btn.onclick = async () => {
@@ -275,6 +305,7 @@ const renderAccordion = async (itemId, container) => {
             <th>Локація</th>
             <th>Рахується</th>
             <th>В наявності</th>
+						<th>Накладна</th>
             <th>Рапорт</th>
             <th>Витяг з ЖБД</th>
             <th>Примітка</th>

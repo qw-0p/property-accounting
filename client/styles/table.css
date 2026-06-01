@@ -210,3 +210,9 @@
 	font-size: 12px;
 	outline: none;
 }
+
+.drive-field {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
