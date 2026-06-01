@@ -41,6 +41,7 @@ export function ItemsPage({ serviceId } = {}) {
               <th>Найменування</th>
               <th>Згідно накладної</th>
               <th>Од. виміру</th>
+							<th>КН</th>
               <th>Кількість</th>
               <th></th>
             </tr>
@@ -56,6 +57,7 @@ export function ItemsPage({ serviceId } = {}) {
                   <td>${item.name}</td>
                   <td>${item.invoice_name || '—'}</td>
                   <td>${item.unit_name}</td>
+									<td>${item.nomenclature_code || '—'}</td>
                   <td>${item.total_quantity} (${item.available_quantity} в наявності)</td>
                   <td class="row-actions">
                     <button class="btn-ghost edit-btn" data-id="${item.id}">Ред.</button>
@@ -443,6 +445,10 @@ const renderAccordion = async (itemId, container) => {
               <label>Найменування згідно накладної</label>
               <input type="text" name="invoice_name" value="${item?.invoice_name || ''}" />
             </div>
+						<div class="form-group">
+							<label>Код номенклатури (КН)</label>
+							<input type="text" name="nomenclature_code" value="${item?.nomenclature_code || ''}" />
+						</div>
 						<div class="form-group">
 							<label>Служба *</label>
 							<select name="service_id">

@@ -1,0 +1,1 @@
+ALTER TABLE items ADD COLUMN nomenclature_code VARCHAR(50);
