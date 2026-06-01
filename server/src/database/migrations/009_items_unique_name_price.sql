@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX items_name_price_unique ON items (name, price) WHERE price IS NOT NULL;
