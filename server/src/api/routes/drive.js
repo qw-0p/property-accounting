@@ -1,10 +1,12 @@
 const router = require('express').Router()
 const { google } = require('googleapis')
-const { oauth2Client } = require('./auth')
 
 router.get('/files', async (req, res, next) => {
   try {
-    const { access_token, folder_id } = req.query
+    const { folder_id } = req.query
+    const access_token = req.headers.authorization?.replace('Bearer ', '')
+
+    if (!access_token) return res.status(401).json({ message: 'No token' })
 
     const client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -29,6 +31,14 @@ router.get('/files', async (req, res, next) => {
   } catch (e) {
     next(e)
   }
+})
+
+router.get('/folders', (req, res) => {
+  res.json({
+    report: process.env.RAPORT_FOLDER_ID,
+    journal_entry: process.env.EXTRACT_FOLDER_ID,
+    invoice: process.env.INVOICE_FOLDER_ID,
+  })
 })
 
 module.exports = router

@@ -7,16 +7,19 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 )
 
-const SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+const SCOPES = [
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+]
 
 router.get('/google', (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
+    prompt: 'consent',
   })
   res.redirect(url)
 })
-
 router.get('/google/callback', async (req, res) => {
   const { code } = req.query
   const { tokens } = await oauth2Client.getToken(code)

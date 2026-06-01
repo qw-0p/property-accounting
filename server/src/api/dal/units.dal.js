@@ -30,12 +30,12 @@ const getById = async (id) => {
 }
 
 const create = async (item_id, data) => {
-  const { serial_number, status_id, location_id, counted, available, report, journal_entry, note } = data
+  const { serial_number, status_id, location_id, counted, available, report, journal_entry, note, invoice } = data
   const { rows } = await pool.query(
-    `INSERT INTO units (item_id, serial_number, status_id, location_id, counted, available, report, journal_entry, note)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `INSERT INTO units (item_id, serial_number, status_id, location_id, counted, available, report, journal_entry, note, invoice)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     RETURNING *`,
-    [item_id, serial_number || null, status_id || null, location_id || null, counted ?? true, available ?? true, report || null, journal_entry || null, note || null]
+    [item_id, serial_number || null, status_id || null, location_id || null, counted ?? true, available ?? true, report || null, journal_entry || null, note || null, invoice || null]
   )
   return rows[0]
 }
@@ -45,7 +45,7 @@ const update = async (id, data) => {
   const values = []
   let i = 1
 
-  const allowed = ['serial_number', 'status_id', 'location_id', 'counted', 'available', 'report', 'journal_entry', 'note']
+  const allowed = ['serial_number', 'status_id', 'location_id', 'counted', 'available', 'report', 'journal_entry', 'note', 'invoice']
 
   for (const key of allowed) {
     if (data[key] !== undefined) {
