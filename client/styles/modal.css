@@ -138,3 +138,51 @@
 .drive-file-name {
 	color: #374151;
 }
+
+.import-section {
+	border-top: 1px solid #e2e8f0;
+	padding-top: 16px;
+	margin-top: 4px;
+}
+
+.import-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+	font-size: 13px;
+	font-weight: 500;
+	color: #64748b;
+}
+
+.parsed-table-wrap {
+	overflow-x: auto;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+	margin-top: 8px;
+}
+
+.parsed-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.parsed-table th {
+	padding: 8px 10px;
+	background: #f8fafc;
+	font-weight: 600;
+	color: #64748b;
+	border-bottom: 1px solid #e2e8f0;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.parsed-table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid #f1f5f9;
+}
+
+.parsed-table tbody tr:last-child td {
+	border-bottom: none;
+}

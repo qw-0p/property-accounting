@@ -24,9 +24,9 @@ export async function DrivePicker({ field, onSelect, onClose }) {
           <div class="modal-body" style="padding:0">
             <div class="drive-toolbar">
               ${folderStack.length > (rootFolderId ? 1 : 0)
-                ? `<button class="btn-ghost drive-back-btn">← Назад</button>`
-                : ''
-              }
+        ? `<button class="btn-ghost drive-back-btn">← Назад</button>`
+        : ''
+      }
               <span class="drive-path">${folderStack.map(f => f.name).join(' / ') || 'Мій диск'}</span>
             </div>
             <div id="drive-files" style="padding:16px;min-height:200px">

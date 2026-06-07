@@ -8,7 +8,7 @@ const oauth2Client = new google.auth.OAuth2(
 )
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/drive.metadata.readonly',
 ]
 
@@ -31,6 +31,20 @@ router.get('/google/callback', async (req, res) => {
   })
 
   res.redirect(`http://localhost:8080/#/auth/callback?${params}`)
+})
+
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const { refresh_token } = req.body
+    if (!refresh_token) return res.status(400).json({ message: 'No refresh token' })
+
+    oauth2Client.setCredentials({ refresh_token })
+    const { credentials } = await oauth2Client.refreshAccessToken()
+
+    res.json({ access_token: credentials.access_token })
+  } catch (e) {
+    next(e)
+  }
 })
 
 module.exports = { router, oauth2Client }
