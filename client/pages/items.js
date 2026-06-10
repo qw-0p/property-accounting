@@ -343,103 +343,240 @@ const openModal = (id = null) => {
   const item = id ? items.find(i => i.id === id) : null
   const container = document.getElementById('modal-container')
   let parsedRows = []
+  let mode = 'form' // 'form' | 'import'
 
-  container.innerHTML = `
-    <div class="modal-overlay">
-      <div class="modal" style="width:760px">
-        <div class="modal-header">
-          <h2>${item ? 'Редагувати майно' : 'Додати майно'}</h2>
-          <button class="btn-ghost modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label>Найменування *</label>
-            <input type="text" name="name" value="${item?.name || ''}" />
-          </div>
-          <div class="form-group">
-            <label>Найменування згідно накладної</label>
-            <input type="text" name="invoice_name" value="${item?.invoice_name || ''}" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Одиниця виміру *</label>
-              <select name="unit_of_measure_id">
-                <option value="">— Оберіть</option>
-                ${unitsOfMeasure.map(u => `<option value="${u.id}" ${item?.unit_of_measure_id == u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Код номенклатури (КН)</label>
-              <input type="text" name="nomenclature_code" value="${item?.nomenclature_code || ''}" placeholder="наприклад: 6/42" />
-            </div>
-            <div class="form-group">
-              <label>Ціна за одиницю</label>
-              <input type="number" name="price" value="${item?.price || ''}" step="0.01" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Служба *</label>
-              <select name="service_id">
-                <option value="">— Оберіть службу</option>
-                ${services.map(s => `<option value="${s.id}" ${item?.service_id == s.id || serviceId == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
-              </select>
-            </div>
+  const renderModal = () => {
+    container.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal ${mode === 'import' ? 'modal--wide' : ''}"
+             style="${mode === 'import' ? 'width:95vw;max-width:1400px;height:90vh' : 'width:760px'}">
+
+          <div class="modal-header">
+            <h2>${item ? 'Редагувати майно' : 'Додати майно'}</h2>
+            <button class="btn-ghost modal-close">✕</button>
           </div>
 
-          ${!item ? `
-          <div class="import-section">
-            <div class="import-header">
-              <span>Імпорт з накладної</span>
-              <button class="btn-ghost" id="pick-invoice-btn">📁 Вибрати PDF з Drive</button>
-            </div>
-            <div id="parsed-result"></div>
-          </div>
-          ` : ''}
+          ${mode === 'form' ? renderFormMode() : renderImportMode()}
+
         </div>
-        <div class="modal-footer">
-          <button class="btn-ghost modal-close">Скасувати</button>
-          ${!item ? `<button class="btn-ghost" id="modal-save-parsed" style="display:none">Імпортувати всі (0)</button>` : ''}
-          <button class="btn-primary" id="modal-save">Зберегти</button>
+      </div>
+    `
+    bindEvents()
+  }
+
+  // ── СТАН 1: звичайна форма ──────────────────────────────────────────────────
+  const renderFormMode = () => `
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Найменування *</label>
+        <input type="text" name="name" value="${item?.name || ''}" />
+      </div>
+      <div class="form-group">
+        <label>Найменування згідно накладної</label>
+        <input type="text" name="invoice_name" value="${item?.invoice_name || ''}" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Одиниця виміру *</label>
+          <select name="unit_of_measure_id">
+            <option value="">— Оберіть</option>
+            ${unitsOfMeasure.map(u => `<option value="${u.id}" ${item?.unit_of_measure_id == u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Код номенклатури (КН)</label>
+          <input type="text" name="nomenclature_code" value="${item?.nomenclature_code || ''}" placeholder="наприклад: 6/42" />
+        </div>
+        <div class="form-group">
+          <label>Ціна за одиницю</label>
+          <input type="number" name="price" value="${item?.price || ''}" step="0.01" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Служба *</label>
+          <div>
+          <select name="service_id">
+            <option value="">— Оберіть службу</option>
+            ${services.map(s => `<option value="${s.id}" ${item?.service_id == s.id || serviceId == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+          </select>
+          
         </div>
       </div>
     </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost modal-close">Скасувати</button>
+      ${!item ? `<button class="btn-ghost" id="btn-switch-import">📁 Завантажити з накладної</button>` : ''}
+      <button class="btn-primary" id="modal-save">Зберегти</button>
+    </div>
   `
 
-  container.querySelectorAll('.modal-close').forEach(btn => {
-    btn.onclick = () => { container.innerHTML = '' }
-  })
+  // ── СТАН 2: імпорт з PDF ───────────────────────────────────────────────────
+  const renderImportMode = () => `
+    <div class="modal-import-top">
+      <div class="form-group" style="min-width:220px">
 
-  // pick invoice pdf
-  const pickBtn = container.querySelector('#pick-invoice-btn')
-  if (pickBtn) {
-    pickBtn.onclick = async () => {
-      await DrivePicker({
-        field: 'invoice',
-        onSelect: async ({ id: fileId, name }) => {
-          pickBtn.textContent = `📄 ${name}`
-          pickBtn.disabled = true
+        <select name="service_id">
+          <option value="">— Оберіть службу</option>
+          ${services.map(s => `<option value="${s.id}" ${serviceId == s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-ghost" id="pick-invoice-btn" style="align-self:flex-end">📁 Вибрати PDF</button>
+    </div>
 
-          const resultContainer = container.querySelector('#parsed-result')
-          resultContainer.innerHTML = '<span style="color:#999;font-size:13px">Парсинг PDF...</span>'
+    <div class="modal-body--split" style="flex:1;overflow:hidden">
+      <!-- Ліво: PDF preview -->
+      <div class="modal-pdf-panel" id="pdf-panel">
+        <div class="pdf-placeholder" id="pdf-placeholder">
+          <span>📄</span>
+          <p>PDF preview з'явиться тут після вибору файлу</p>
+        </div>
+        <iframe id="pdf-iframe" style="display:none;width:100%;height:100%;border:none"></iframe>
+      </div>
 
-          try {
-            const { rows } = await driveApi.parseInvoice(fileId)
-						console.log('parsed rows:', rows)
-            parsedRows = rows.map(r => ({ ...r, _selected: true }))
-            renderParsedRows(resultContainer)
-					} catch (e) {
-						console.error('parse error:', e)
-            resultContainer.innerHTML = '<span style="color:#ef4444;font-size:13px">Помилка парсингу</span>'
-          } finally {
-            pickBtn.disabled = false
+      <!-- Право: таблиця рядків -->
+      <div class="modal-import-panel">
+        <div id="parsed-result" style="padding:16px;color:#94a3b8;font-size:13px">
+          Після вибору PDF тут з'являться розпізнані рядки
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" id="btn-back-form">← Назад до форми</button>
+      <button class="btn-ghost modal-close">Скасувати</button>
+      <button class="btn-primary" id="modal-save-parsed" style="display:none">Імпортувати (0)</button>
+    </div>
+  `
+
+  // ── bind events ─────────────────────────────────────────────────────────────
+  const bindEvents = () => {
+    container.querySelectorAll('.modal-close').forEach(btn => {
+      btn.onclick = () => { container.innerHTML = '' }
+    })
+
+    // Перемикання в режим імпорту
+    const switchBtn = container.querySelector('#btn-switch-import')
+    if (switchBtn) {
+      switchBtn.onclick = () => { mode = 'import'; renderModal() }
+    }
+
+    // Назад до форми
+    const backBtn = container.querySelector('#btn-back-form')
+    if (backBtn) {
+      backBtn.onclick = () => { mode = 'form'; parsedRows = []; renderModal() }
+    }
+
+    // Зберегти один item (форма)
+    const saveBtn = container.querySelector('#modal-save')
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        const data = {}
+        container.querySelectorAll('[name]').forEach(input => {
+          data[input.name] = input.value === '' ? null : input.value
+        })
+        if (!data.name) { alert('Введіть найменування'); return }
+        if (!data.service_id) { alert('Оберіть службу'); return }
+        if (item) {
+          await itemsApi.update(item.id, data)
+        } else {
+          await itemsApi.create(data)
+        }
+        container.innerHTML = ''
+        load()
+      }
+    }
+
+    // PDF picker
+    const pickBtn = container.querySelector('#pick-invoice-btn')
+    if (pickBtn) {
+      pickBtn.onclick = async () => {
+        await DrivePicker({
+          field: 'invoice',
+          onSelect: async ({ id: fileId, name }) => {
+            // PDF preview
+            const iframe = container.querySelector('#pdf-iframe')
+            const placeholder = container.querySelector('#pdf-placeholder')
+            if (iframe && placeholder) {
+              iframe.src = `https://drive.google.com/file/d/${fileId}/preview`
+              iframe.style.display = 'block'
+              placeholder.style.display = 'none'
+            }
+
+            const statusEl = container.querySelector('#import-status')
+            if (statusEl) statusEl.textContent = `⏳ Парсинг ${name}...`
+            pickBtn.disabled = true
+
+            const resultContainer = container.querySelector('#parsed-result')
+            resultContainer.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ Розпізнаю рядки...</span>'
+
+            try {
+              const { rows } = await driveApi.parseInvoice(fileId)
+              parsedRows = rows.map(r => ({ ...r, _selected: true, quantity: r.qty_sent || 1 }))
+              if (statusEl) statusEl.textContent = `📄 ${name}`
+              renderParsedRows(resultContainer)
+            } catch (e) {
+              console.error('parse error:', e)
+              resultContainer.innerHTML = '<span style="color:#ef4444;font-size:13px">Помилка парсингу</span>'
+              if (statusEl) statusEl.textContent = 'Помилка'
+            } finally {
+              pickBtn.disabled = false
+            }
+          },
+          onClose: () => {}
+        })
+      }
+    }
+
+    // Імпортувати вибрані
+    const saveAllBtn = container.querySelector('#modal-save-parsed')
+    if (saveAllBtn) {
+      saveAllBtn.onclick = async () => {
+        const selected = parsedRows.filter(r => r._selected)
+        if (!selected.length) return
+
+        const currentServiceId = container.querySelector('[name="service_id"]')?.value
+        if (!currentServiceId) { alert('Оберіть службу'); return }
+
+        // Перевіряємо одиниці виміру
+        const missingUnit = selected.filter(r => !r.unit)
+        if (missingUnit.length) {
+          alert(`Оберіть одиницю виміру для рядків:\n${missingUnit.map(r => r.name || '(без назви)').join('\n')}`)
+          return
+        }
+
+        saveAllBtn.disabled = true
+        saveAllBtn.textContent = 'Імпортую...'
+
+        for (const row of selected) {
+          const uom = unitsOfMeasure.find(u => u.name === row.unit)
+          const newItem = await itemsApi.create({
+            name: row.name || '—',
+            invoice_name: row.name || null,
+            nomenclature_code: row.nomenclature_code || null,
+            unit_of_measure_id: uom?.id || null,
+            price: row.price || null,
+            service_id: currentServiceId,
+          })
+
+          const qty = parseInt(row.quantity) || 1
+          for (let i = 0; i < qty; i++) {
+            await unitsApi.create(newItem.id, {
+              serial_number: null,
+              status_id: null,
+              location_id: null,
+            })
           }
-        },
-        onClose: () => {}
-      })
+        }
+
+        container.innerHTML = ''
+        load()
+      }
     }
   }
 
+  // ── рендер таблиці розпізнаних рядків ───────────────────────────────────────
   const renderParsedRows = (resultContainer) => {
     if (!parsedRows.length) {
       resultContainer.innerHTML = '<span style="color:#ef4444;font-size:13px">Не вдалось знайти рядки в PDF</span>'
@@ -448,9 +585,8 @@ const openModal = (id = null) => {
 
     const saveAllBtn = container.querySelector('#modal-save-parsed')
     if (saveAllBtn) {
-      const selected = parsedRows.filter(r => r._selected).length
       saveAllBtn.style.display = ''
-      saveAllBtn.textContent = `Імпортувати (${selected})`
+      saveAllBtn.textContent = `Імпортувати (${parsedRows.filter(r => r._selected).length})`
     }
 
     resultContainer.innerHTML = `
@@ -470,16 +606,16 @@ const openModal = (id = null) => {
             ${parsedRows.map((row, idx) => `
               <tr>
                 <td><input type="checkbox" class="parsed-row-check" data-idx="${idx}" ${row._selected ? 'checked' : ''} /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="name" value="${row.name || ''}" /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="nomenclature_code" value="${row.nomenclature_code || ''}" style="width:70px" /></td>
+                <td><input class="unit-inline-input" data-idx="${idx}" data-field="name" value="${row.name || ''}" style="width:180px" /></td>
+                <td><input class="unit-inline-input" data-idx="${idx}" data-field="nomenclature_code" value="${row.nomenclature_code || ''}" style="width:110px" /></td>
                 <td>
                   <select class="unit-inline-select" data-idx="${idx}" data-field="unit">
                     <option value="">—</option>
                     ${unitsOfMeasure.map(u => `<option value="${u.name}" ${row.unit === u.name ? 'selected' : ''}>${u.name}</option>`).join('')}
                   </select>
                 </td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="price" value="${row.price || ''}" style="width:90px" /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="quantity" value="${row.quantity || 1}" style="width:50px" type="number" min="1" /></td>
+                <td><input class="unit-inline-input" data-idx="${idx}" data-field="price" value="${row.price || ''}" style="width:80px" type="number" step="0.01" /></td>
+                <td><input class="unit-inline-input" data-idx="${idx}" data-field="quantity" value="${row.quantity || 1}" style="width:60px" type="number" min="1" /></td>
               </tr>
             `).join('')}
           </tbody>
@@ -491,84 +627,28 @@ const openModal = (id = null) => {
     resultContainer.querySelector('#select-all-parsed').onchange = (e) => {
       parsedRows.forEach(r => r._selected = e.target.checked)
       resultContainer.querySelectorAll('.parsed-row-check').forEach(cb => cb.checked = e.target.checked)
-      const saveAllBtn = container.querySelector('#modal-save-parsed')
-      if (saveAllBtn) saveAllBtn.textContent = `Імпортувати (${parsedRows.filter(r => r._selected).length})`
+      const btn = container.querySelector('#modal-save-parsed')
+      if (btn) btn.textContent = `Імпортувати (${parsedRows.filter(r => r._selected).length})`
     }
 
-    // checkbox per row
     resultContainer.querySelectorAll('.parsed-row-check').forEach(cb => {
       cb.onchange = () => {
         parsedRows[parseInt(cb.dataset.idx)]._selected = cb.checked
-        const saveAllBtn = container.querySelector('#modal-save-parsed')
-        if (saveAllBtn) saveAllBtn.textContent = `Імпортувати (${parsedRows.filter(r => r._selected).length})`
+        const btn = container.querySelector('#modal-save-parsed')
+        if (btn) btn.textContent = `Імпортувати (${parsedRows.filter(r => r._selected).length})`
       }
     })
 
-    // inline edit
     resultContainer.querySelectorAll('[data-field]').forEach(input => {
       input.oninput = () => {
         parsedRows[parseInt(input.dataset.idx)][input.dataset.field] = input.value
       }
-      input.onchange = () => {
-        parsedRows[parseInt(input.dataset.idx)][input.dataset.field] = input.value
-      }
     })
   }
 
-  // імпортувати всі вибрані
-  const saveAllBtn = container.querySelector('#modal-save-parsed')
-  if (saveAllBtn) {
-    saveAllBtn.onclick = async () => {
-      const selected = parsedRows.filter(r => r._selected)
-      if (!selected.length) return
-
-      const currentServiceId = container.querySelector('[name="service_id"]')?.value
-      if (!currentServiceId) {
-        alert('Оберіть службу')
-        return
-      }
-
-      saveAllBtn.disabled = true
-      saveAllBtn.textContent = 'Імпортую...'
-
-      for (const row of selected) {
-        const uom = unitsOfMeasure.find(u => u.name === row.unit)
-        await itemsApi.create({
-          name: row.name,
-          nomenclature_code: row.nomenclature_code || null,
-          unit_of_measure_id: uom?.id || null,
-          price: row.price || null,
-          service_id: currentServiceId,
-        })
-      }
-
-      container.innerHTML = ''
-      load()
-    }
-  }
-
-  // зберегти один item
-  container.querySelector('#modal-save').onclick = async () => {
-    const data = {}
-    container.querySelectorAll('[name]').forEach(input => {
-      data[input.name] = input.value === '' ? null : input.value
-    })
-
-    if (!data.service_id) {
-      alert('Оберіть службу')
-      return
-    }
-
-    if (item) {
-      await itemsApi.update(item.id, data)
-    } else {
-      await itemsApi.create(data)
-    }
-
-    container.innerHTML = ''
-    load()
-  }
+  renderModal()
 }
+ 
 
   const load = async () => {
 		const params = {}

@@ -9,18 +9,40 @@ const num = s => {
 	return parseFloat(c.slice(0, last).replace(/[.,]/g, '') + '.' + c.slice(last + 1)) || null
 }
 
-const NUMERIC_FIELDS = ['price', 'qty_sent', 'qty_received', 'qty_received', 'qty_disposed', 'qty_available', 'total']
+const NUMERIC_FIELDS = ['price', 'qty_sent', 'qty_received', 'qty_disposed', 'qty_available', 'total']
+
+// Прибираємо рядки що складаються переважно з OCR-сміття
+function cleanText(s) {
+	if (!s) return null
+	const str = s.trim()
+	if (!str) return null
+	const letters = (str.match(/[\p{L}\d]/gu) || []).length
+	if (str.length > 5 && letters / str.length < 0.4) return null
+	// Прибираємо зайві символи з країв
+	return str.replace(/^[|\-\s\/\\]+|[|\-\s\/\\]+$/g, '').trim() || null
+}
 
 function normalizeRow(row) {
 	const out = { ...row }
 	delete out._partial
+	delete out.row_no
+
+	// Очищаємо текстові поля
+	for (const k of ['name', 'nomenclature_code', 'unit']) {
+		out[k] = cleanText(out[k])
+	}
+
+	// Числові поля
 	for (const f of NUMERIC_FIELDS) {
 		if (f in out) out[f] = num(out[f])
 	}
-	if ('row_no' in out) out.row_no = parseInt(out.row_no) || null
+	if (out.price !== undefined) out.price = num(out.price)
+
+	// Прибираємо null поля
 	for (const k of Object.keys(out)) {
-		if (typeof out[k] === 'string') out[k] = out[k].trim() || null
+		if (out[k] === null || out[k] === undefined || out[k] === '') delete out[k]
 	}
+
 	return out
 }
 
@@ -44,9 +66,12 @@ router.post('/invoice', async (req, res, next) => {
 			{ responseType: 'arraybuffer' }
 		)
 		const cells = await extractTableRows(Buffer.from(data))
-		const rows = cells.map(normalizeRow)
+		const rows = cells
+			.map(normalizeRow)
+			.filter(r => r.name || r.nomenclature_code)
+
 		console.log('parsed rows:', rows.length)
-		res.json({ rows })
+		res.json({ rows, file_id })
 	} catch (e) {
 		console.error('Parse error:', e.message)
 		next(e)

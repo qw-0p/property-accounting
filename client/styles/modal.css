@@ -10,6 +10,7 @@
 }
 
 .modal {
+	padding: 20px;
 	background: #fff;
 	border-radius: 10px;
 	width: 520px;
@@ -41,7 +42,7 @@
 }
 
 .modal-body {
-	padding: 20px;
+	padding: 16px 0;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
@@ -61,18 +62,10 @@
 	flex-direction: column;
 	gap: 5px;
 }
-
-.form-group label {
-	font-size: 12px;
-	font-weight: 500;
-	color: #64748b;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-}
-
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.modal-import-top button {
 	padding: 9px 12px;
 	border: 1px solid #e2e8f0;
 	border-radius: 6px;
@@ -185,4 +178,110 @@
 
 .parsed-table tbody tr:last-child td {
 	border-bottom: none;
+}
+
+.modal--wide {
+	height: 90vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.modal-body--split {
+	display: grid;
+	grid-template-columns: 1fr 480px;
+	gap: 0;
+	flex: 1;
+	overflow: hidden;
+	padding: 0;
+}
+
+.modal-pdf-panel {
+	background: #f1f5f9;
+	border-right: 1px solid #e2e8f0;
+	border-radius: 0 0 0 10px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pdf-placeholder {
+	text-align: center;
+	color: #94a3b8;
+	padding: 40px;
+}
+
+.pdf-placeholder span {
+	font-size: 48px;
+	display: block;
+	margin-bottom: 12px;
+}
+
+.pdf-placeholder p {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.modal-form-panel {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+/* Широка модалка для імпорту */
+.modal--wide {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Верхній рядок в режимі імпорту: служба + статус + кнопка */
+.modal-import-top {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 16px 0;
+}
+
+/* Split layout: ліво PDF, право таблиця */
+.modal-body--split {
+	display: grid;
+	grid-template-columns: 1fr 520px;
+	gap: 0;
+}
+
+/* Ліва панель — PDF */
+.modal-pdf-panel {
+	background: #f8fafc;
+	border-right: 1px solid #e2e8f0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.pdf-placeholder {
+	text-align: center;
+	color: #94a3b8;
+	padding: 40px;
+}
+
+.pdf-placeholder span {
+	font-size: 48px;
+	display: block;
+	margin-bottom: 12px;
+}
+
+.pdf-placeholder p {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+/* Права панель — таблиця */
+.modal-import-panel {
+	overflow-y: auto;
+}
+
+.parsed-table-wrap {
+	padding: 12px;
 }

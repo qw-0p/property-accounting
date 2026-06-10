@@ -19,7 +19,7 @@ async function ocrPages(pages) {
 			items.push({
 				text,
 				x: x0,
-				y: height - y0,
+				y: y0,
 				w: x1 - x0,
 				page,
 			})
