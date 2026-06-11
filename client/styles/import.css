@@ -16,7 +16,7 @@
 /* Ліво: PDF, право: таблиця рядків */
 .import-split {
 	display: grid;
-	grid-template-columns: 1fr 520px;
+	grid-template-columns: 1fr 1fr;
 	gap: 0;
 	height: calc(100vh - 200px);
 	border: 1px solid #e2e8f0;

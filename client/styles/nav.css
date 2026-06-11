@@ -1,14 +1,67 @@
 /* client/styles/nav.css */
-nav {
-	width: 240px;
-	min-width: 240px;
+
+/* Плаваюча кнопка-сендвіч */
+.nav-toggle {
+	position: fixed;
+	top: 12px;
+	left: 12px;
+	z-index: 1100;
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
 	background: #1e293b;
 	color: #fff;
-	padding: 20px 12px;
+	font-size: 18px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	cursor: pointer;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.nav-toggle:hover {
+	background: #334155;
+}
+
+/* Сайдбар — off-canvas */
+nav {
+	position: fixed;
+	top: 0;
+	left: 0;
+	height: 100vh;
+	width: 240px;
+	background: #1e293b;
+	color: #fff;
+	padding: 64px 12px 20px;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 	overflow-y: auto;
+	transform: translateX(-100%);
+	transition: transform 0.2s ease;
+	z-index: 1090;
+}
+
+body.nav-open nav {
+	transform: translateX(0);
+}
+
+/* Затемнення під час відкритого меню */
+.nav-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.5);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s ease;
+	z-index: 1080;
+}
+
+body.nav-open .nav-overlay {
+	opacity: 1;
+	pointer-events: auto;
 }
 
 nav .nav-title {

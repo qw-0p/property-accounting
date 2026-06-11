@@ -19,6 +19,15 @@ const main = document.getElementById('main')
 const servicesList = document.getElementById('services-list')
 const authContainer = document.getElementById('auth-btn-container')
 
+const navToggle = document.getElementById('nav-toggle')
+const navOverlay = document.getElementById('nav-overlay')
+const nav = document.querySelector('nav')
+
+const closeNav = () => document.body.classList.remove('nav-open')
+navToggle.onclick = () => document.body.classList.toggle('nav-open')
+navOverlay.onclick = closeNav
+nav.addEventListener('click', (e) => { if (e.target.closest('a')) closeNav() })
+
 function renderAuthBtn() {
   if (driveApi.isAuthorized()) {
     authContainer.innerHTML = `<button class="nav-auth nav-auth-logout" id="logout-btn">⬡ Вийти з Google</button>`
