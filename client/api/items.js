@@ -1,4 +1,3 @@
-// client/api/items.js
 const BASE_URL = 'http://localhost:3000'
 
 export const itemsApi = {
@@ -9,6 +8,14 @@ export const itemsApi = {
   },
   getById: async (id) => {
     const res = await fetch(`${BASE_URL}/items/${id}`)
+    return res.json()
+  },
+  lookup: async (data) => {
+    const res = await fetch(`${BASE_URL}/items/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
     return res.json()
   },
   create: async (data) => {

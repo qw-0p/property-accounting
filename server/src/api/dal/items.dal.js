@@ -68,6 +68,21 @@ const getById = async (id) => {
   return rows[0]
 }
 
+const findMatches = async (name, code) => {
+  const { rows } = await pool.query(
+    `SELECT i.*,
+      uom.name AS unit_name,
+      s.name AS service_name
+    FROM items i
+    LEFT JOIN units_of_measure uom ON uom.id = i.unit_of_measure_id
+    LEFT JOIN services s ON s.id = i.service_id
+    WHERE ($1::text IS NOT NULL AND lower(trim(i.name)) = lower(trim($1)))
+       OR ($2::text IS NOT NULL AND $2 <> '' AND i.nomenclature_code = $2)`,
+    [name || null, code || null]
+  )
+  return rows
+}
+
 const create = async (data) => {
   const { name, invoice_name, unit_of_measure_id, service_id, nomenclature_code, price } = data
   const { rows } = await pool.query(
@@ -112,4 +127,4 @@ const remove = async (id) => {
   return rows[0]
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = { getAll, getById, findMatches, create, update, remove }

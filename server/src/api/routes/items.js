@@ -7,6 +7,12 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+router.post('/lookup', async (req, res, next) => {
+  try {
+    res.json(await service.lookup(req.body))
+  } catch (e) { next(e) }
+})
+
 router.get('/:id', async (req, res, next) => {
   try {
     res.json(await service.getById(req.params.id))

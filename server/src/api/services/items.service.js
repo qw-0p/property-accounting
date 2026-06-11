@@ -7,8 +7,7 @@ const getAll = async (query) => {
 
   return dal.getAll({
     search: query.search,
-    status_id: query.status_id,
-    location_id: query.location_id,
+    service_id: query.service_id,
     limit,
     offset,
   })
@@ -18,6 +17,60 @@ const getById = async (id) => {
   const item = await dal.getById(id)
   if (!item) throw { status: 404, message: 'Item not found' }
   return item
+}
+
+const toNum = (v) => (v === null || v === undefined || v === '') ? null : Number(v)
+
+// Ціна — частина ідентичності item. Різна ціна = різний item.
+const priceEq = (a, b) => {
+  const x = toNum(a), y = toNum(b)
+  if (x === null && y === null) return true
+  if (x === null || y === null) return false
+  return Math.abs(x - y) < 1e-9
+}
+
+// Повертає { exact, conflicts }.
+// Ключ ідентичності item = назва + КН + ціна.
+//  - ціна задана: exact лише при збігу всіх трьох; та сама назва+КН з іншою ціною → інший item (нове)
+//  - ціна порожня: розрізнити за ціною не можна →
+//       один збіг назва+КН  → exact (доливаємо)
+//       кілька (різні ціни) → conflict (обрати варіант або створити нове)
+//  - частковий збіг (лише назва АБО лише код) → conflict (matchedOn: 'name' | 'code')
+const lookup = async ({ name, nomenclature_code, price }) => {
+  const candidates = await dal.findMatches(name, nomenclature_code)
+  const nm = (name || '').trim().toLowerCase()
+  const cd = (nomenclature_code || '').trim()
+  const pin = toNum(price)
+
+  let exact = null
+  const conflicts = []
+  const strongMatches = [] // збіг назва+КН (для випадку порожньої ціни)
+
+  for (const it of candidates) {
+    const inm = (it.name || '').trim().toLowerCase()
+    const icd = (it.nomenclature_code || '').trim()
+    const nameEq = !!nm && inm === nm
+    const codeEq = !!cd && icd === cd
+    const bothNoCode = !cd && !icd
+    const strong = nameEq && (codeEq || bothNoCode)
+
+    if (strong) {
+      if (pin === null) { strongMatches.push(it); continue }
+      if (priceEq(pin, it.price)) { exact = it; break }
+      continue // ціна задана й інша → інший item
+    }
+    if (nameEq || codeEq) conflicts.push({ ...it, matchedOn: nameEq ? 'name' : 'code' })
+  }
+
+  if (exact) return { exact, conflicts: [] }
+
+  // Порожня ціна: вирішуємо за кількістю збігів назва+КН
+  if (pin === null && strongMatches.length) {
+    if (strongMatches.length === 1) return { exact: strongMatches[0], conflicts: [] }
+    return { exact: null, conflicts: strongMatches.map(it => ({ ...it, matchedOn: 'price' })) }
+  }
+
+  return { exact: null, conflicts }
 }
 
 const create = async (data) => {
@@ -38,4 +91,4 @@ const remove = async (id) => {
   return item
 }
 
-module.exports = { getAll, getById, create, update, remove }
+module.exports = { getAll, getById, lookup, create, update, remove }
