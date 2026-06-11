@@ -32,6 +32,10 @@ function normalizeRow(row) {
 		out[k] = cleanText(out[k])
 	}
 
+	if (out.nomenclature_code) {
+		const cleaned = out.nomenclature_code.replace(/[^\d\-\/\.]/g, '').trim()
+		out.nomenclature_code = (cleaned && /\d/.test(cleaned)) ? cleaned : null
+	}
 	// Числові поля
 	for (const f of NUMERIC_FIELDS) {
 		if (f in out) out[f] = num(out[f])
@@ -65,13 +69,13 @@ router.post('/invoice', async (req, res, next) => {
 			{ fileId: file_id, alt: 'media' },
 			{ responseType: 'arraybuffer' }
 		)
-		const cells = await extractTableRows(Buffer.from(data))
+		const { rows: cells, viz } = await extractTableRows(Buffer.from(data))
 		const rows = cells
-			.map(normalizeRow)
-			.filter(r => r.name || r.nomenclature_code)
+				.map(normalizeRow)
+				.filter(r => r.name || r.nomenclature_code)
 
 		console.log('parsed rows:', rows.length)
-		res.json({ rows, file_id })
+		res.json({ rows, file_id, viz })
 	} catch (e) {
 		console.error('Parse error:', e.message)
 		next(e)

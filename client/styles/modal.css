@@ -13,7 +13,8 @@
 	padding: 20px;
 	background: #fff;
 	border-radius: 10px;
-	width: 520px;
+	width: 90vw;
+	height: 90vh;
 	max-width: 95vw;
 	max-height: 90vh;
 	display: flex;
@@ -284,4 +285,32 @@
 
 .parsed-table-wrap {
 	padding: 12px;
+}
+
+/* PDF tabs */
+.pdf-tabs {
+	display: flex;
+	border-bottom: 1px solid #e2e8f0;
+	background: #fff;
+}
+
+.pdf-tab {
+	padding: 8px 16px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font-size: 13px;
+	color: #64748b;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+}
+
+.pdf-tab:hover {
+	color: #3b82f6;
+}
+
+.pdf-tab.active {
+	color: #3b82f6;
+	border-bottom: 2px solid #3b82f6;
+	font-weight: 500;
 }

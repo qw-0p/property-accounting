@@ -136,11 +136,10 @@ def ocr_cell(gray, x1, y1, x2, y2, pad=4):
 COLUMN_MAP = [
     {'field': 'row_no',             'keywords': ['№', 'з/п', 'п/п', 'no']},
     {'field': 'name', 'keywords': ['назва', 'найменування', 'newn', 'нева', 'група']},
-		{'field': 'nomenclature_code', 'keywords': ['код', 'номенклатур', 'поменклатур', 'помейклатур', 'koa']},
+	{'field': 'nomenclature_code', 'keywords': ['код', 'номенклатур', 'поменклатур', 'помейклатур', 'koa']},
     {'field': 'price', 'keywords': ['ціна', 'вартість за', 'одиницю', 'вартість одн', 'інь']},
     {'field': 'unit',               'keywords': ['одиниц', 'виміру', 'измер']},
     {'field': 'category',           'keywords': ['категор', 'сорт']},
-		
     {'field': 'qty_sent',           'keywords': ['відправлено', 'відпущено', 'вимагається']},
     {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло']},
     {'field': 'total',              'keywords': ['сума']},

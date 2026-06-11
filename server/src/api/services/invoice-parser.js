@@ -25,7 +25,7 @@ async function extractTableRows(buffer) {
     }
 
     console.log(`Extracted ${allRows.length} rows total`)
-    return allRows
+    return { rows: allRows, viz: vizBase64 }
 }
 
 module.exports = { extractTableRows }
