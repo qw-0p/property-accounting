@@ -25,7 +25,10 @@ export function ItemsPage({ serviceId } = {}) {
     el.innerHTML = `
       <div class="page-header">
         <h1>Майно</h1>
-        <button class="btn-primary" id="add-item-btn">+ Додати</button>
+        <div>
+          <button class="btn-primary" id="add-item-btn">+ Додати</button>
+          <a href="#/items/import" class="btn-ghost">📁 З накладної</a>
+        </div>
       </div>
 
       <div class="filters">
@@ -122,10 +125,6 @@ export function ItemsPage({ serviceId } = {}) {
 
     el.querySelectorAll('.edit-btn').forEach(btn => {
       btn.onclick = () => openModal(parseInt(btn.dataset.id), getCtx())
-    })
-
-    el.querySelectorAll('.edit-btn').forEach(btn => {
-      btn.onclick = () => openModal(parseInt(btn.dataset.id))
     })
 
     el.querySelectorAll('.accordion-trigger').forEach(td => {

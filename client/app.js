@@ -1,5 +1,6 @@
 import { ItemsPage } from './pages/items.js'
 import { DictPage } from './pages/dict.js'
+import { InvoiceImportPage } from './pages/invoice-import.js'
 import { dictApi } from './api/dict.js'
 import { driveApi } from './api/drive.js'
 
@@ -11,6 +12,7 @@ const routes = {
   '#/locations': () => DictPage({ resource: 'locations', title: 'Локації' }),
   '#/services': () => DictPage({ resource: 'services', title: 'Служби' }),
   '#/units-of-measure': () => DictPage({ resource: 'units-of-measure', title: 'Одиниці виміру' }),
+  '#/items/import': () => InvoiceImportPage(),
 }
 
 const main = document.getElementById('main')

@@ -1,0 +1,39 @@
+/* client/styles/import.css */
+
+.import-top {
+	display: flex;
+	align-items: flex-end;
+	gap: 16px;
+	margin: 16px 0;
+}
+
+.import-top button {
+	padding: 9px 16px;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+}
+
+/* Ліво: PDF, право: таблиця рядків */
+.import-split {
+	display: grid;
+	grid-template-columns: 1fr 520px;
+	gap: 0;
+	height: calc(100vh - 200px);
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+	overflow: hidden;
+	background: #fff;
+}
+
+.import-pdf-panel {
+	background: #f8fafc;
+	border-right: 1px solid #e2e8f0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.import-rows-panel {
+	overflow-y: auto;
+}
