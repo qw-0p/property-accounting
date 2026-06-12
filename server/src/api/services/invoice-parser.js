@@ -4,9 +4,13 @@ const path = require('path')
 
 const EXTRACT_SCRIPT = path.join(__dirname, 'extract_table.py')
 
-function runExtract(png) {
+function runExtract(png, colMap) {
 	return new Promise((resolve, reject) => {
-		const proc = spawn('python3', [EXTRACT_SCRIPT], { timeout: 300000 })
+		const env = colMap
+			? { ...process.env, COL_MAP_JSON: JSON.stringify(colMap) }
+			: process.env
+
+		const proc = spawn('python3', [EXTRACT_SCRIPT], { timeout: 300000, env })
 		const out = []
 		const err = []
 
@@ -33,10 +37,12 @@ async function extractTableRows(buffer) {
 	const pages = await renderPdfToPngs(buffer, 3)
 	const allRows = []
 	let vizBase64 = null
+	let sharedColMap = null
 
 	for (const { page, png } of pages) {
 		try {
-			const { records, viz } = await runExtract(png)
+			const { records, viz, col_map } = await runExtract(png, sharedColMap)
+			if (col_map && !sharedColMap) sharedColMap = col_map
 			allRows.push(...records)
 			if (viz && !vizBase64) vizBase64 = viz
 		} catch (e) {

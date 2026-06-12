@@ -4,7 +4,7 @@ Extract table from invoice image using OpenCV cell detection + pytesseract OCR.
 1. Find table region by detecting lines
 2. Crop to table
 3. Detect cells
-4. OCR each cell
+4. OCR each cell (header band re-OCR'd with rotation to read vertical headers)
 5. Return JSON
 """
 import sys
@@ -46,9 +46,8 @@ def find_table_region(gray):
     sys.stderr.write(f"Table region: ({x},{y}) {w}x{h}\n")
     cropped = gray[y:y+h, x:x+w]
     cropped = cv2.normalize(cropped, None, 0, 255, cv2.NORM_MINMAX)
-    clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8,8))
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     cropped = clahe.apply(cropped)
-    cv2.imwrite(os.path.expanduser('~/Desktop/table_cropped_with_10.png'), cropped)
     return cropped, x, y
 
 def detect_lines(gray):
@@ -60,7 +59,7 @@ def detect_lines(gray):
     h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(40, img_w // 20), 1))
     h_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, h_kernel, iterations=2)
 
-    v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(20, img_h // 30)))
+    v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(40, img_h // 10)))
     v_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, v_kernel, iterations=2)
 
     return h_lines, v_lines
@@ -107,7 +106,44 @@ def build_cells(h_pos, v_pos, img_h, img_w):
             cells.append(row)
     return cells
 
-def ocr_cell(gray, x1, y1, x2, y2, pad=4):
+def _ocr_text_conf(cell, psm=6):
+    """OCR a prepared cell image; return (text, mean_confidence)."""
+    cell = cv2.normalize(cell, None, 0, 255, cv2.NORM_MINMAX)
+    data = pytesseract.image_to_data(
+        cell,
+        lang='ukr+eng',
+        config=f'--psm {psm} --oem 3',
+        output_type=pytesseract.Output.DICT,
+    )
+    words, confs = [], []
+    for txt, conf in zip(data['text'], data['conf']):
+        t = txt.strip()
+        if not t:
+            continue
+        words.append(t)
+        try:
+            c = float(conf)
+        except (TypeError, ValueError):
+            c = -1
+        if c >= 0:
+            confs.append(c)
+    text = ' '.join(' '.join(words).split())
+    mean_conf = (sum(confs) / len(confs)) if confs else 0.0
+    return text, mean_conf
+
+def _ocr_best_orientation(cell):
+    """Try horizontal + both 90° rotations, return text of the most confident."""
+    candidates = [_ocr_text_conf(cell, psm=6)]
+    candidates.append(_ocr_text_conf(cv2.rotate(cell, cv2.ROTATE_90_CLOCKWISE), psm=6))
+    candidates.append(_ocr_text_conf(cv2.rotate(cell, cv2.ROTATE_90_COUNTERCLOCKWISE), psm=6))
+
+    candidates = [c for c in candidates if c[0].strip()]
+    if not candidates:
+        return ''
+    best = max(candidates, key=lambda c: c[1])
+    return best[0]
+
+def ocr_cell(gray, x1, y1, x2, y2, pad=4, try_vertical=False):
     x1 = max(0, x1 + pad)
     y1 = max(0, y1 + pad)
     x2 = min(gray.shape[1], x2 - pad)
@@ -123,14 +159,16 @@ def ocr_cell(gray, x1, y1, x2, y2, pad=4):
         scale = max(40 / max(h, 1), 40 / max(w, 1), 2.0)
         cell = cv2.resize(cell, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-    cell = cv2.normalize(cell, None, 0, 255, cv2.NORM_MINMAX)
+    # Заголовки можуть бути вертикальними → пробуємо обертання й беремо найвпевненіший
+    if try_vertical:
+        return _ocr_best_orientation(cell)
 
+    cell = cv2.normalize(cell, None, 0, 255, cv2.NORM_MINMAX)
     text = pytesseract.image_to_string(
         cell,
         lang='ukr+eng',
         config='--psm 6 --oem 3'
     ).strip()
-
     return ' '.join(text.split())
 
 COLUMN_MAP = [
@@ -140,8 +178,8 @@ COLUMN_MAP = [
     {'field': 'price', 'keywords': ['ціна', 'вартість за', 'одиницю', 'вартість одн', 'інь']},
     {'field': 'unit',               'keywords': ['одиниц', 'виміру', 'измер']},
     {'field': 'category',           'keywords': ['категор', 'сорт']},
-    {'field': 'qty_sent',           'keywords': ['відправлено', 'відпущено', 'вимагається']},
-    {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло']},
+    {'field': 'qty_sent',           'keywords': ['відправлено', 'вимагається']},
+    {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло', 'відпущено']},
     {'field': 'total',              'keywords': ['сума']},
     {'field': 'note',               'keywords': ['примітка']},
 ]
@@ -168,10 +206,16 @@ def map_columns(header_rows):
                 break
     return col_map
 
+HEADER_KEYWORDS = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур',
+                   'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
+
+def header_score(row):
+    row_text = ' '.join(row).lower()
+    return sum(1 for k in HEADER_KEYWORDS if k in row_text)
+
 def find_header_row(cells_text):
     """Find first row with column headers."""
-    keywords = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур',
-                'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
+    keywords = HEADER_KEYWORDS
     for i, row in enumerate(cells_text):
         row_text = ' '.join(row).lower()
         score = sum(1 for k in keywords if k in row_text)
@@ -247,27 +291,62 @@ def extract(input_bytes):
     cells = build_cells(h_pos, v_pos, img_h, img_w)
     sys.stderr.write(f"Cells: {len(cells)} rows x {max(len(r) for r in cells) if cells else 0} cols\n")
 
-    # 4. OCR кожної клітинки
+    # 4. OCR кожної клітинки (горизонтально)
     cells_text = []
     for row in cells:
         row_text = [ocr_cell(table_gray, *cell) for cell in row]
         cells_text.append(row_text)
         sys.stderr.write(f"Row: {row_text}\n")
 
-    # 5. Знаходимо хедер
-    header_idx = find_header_row(cells_text)
-    sys.stderr.write(f"Header row: {header_idx}\n")
+    # 5. Визначаємо заголовок. На сторінках-продовженнях хедера нема —
+    #    тоді використовуємо col_map, переданий з першої сторінки (env COL_MAP_JSON).
+    provided_map = None
+    pm = os.environ.get('COL_MAP_JSON')
+    if pm:
+        try:
+            provided_map = {int(k): v for k, v in json.loads(pm).items()}
+        except Exception:
+            provided_map = None
 
-    # 6. Маппінг колонок
-    col_map = map_columns(cells_text[max(0, header_idx-1):header_idx+2])
-    sys.stderr.write(f"Column map: {col_map}\n")
+    best_idx, best_score = 0, -1
+    for i, row in enumerate(cells_text):
+        s = header_score(row)
+        if s > best_score:
+            best_idx, best_score = i, s
+
+    if best_score >= 2:
+        # На цій сторінці є власний заголовок
+        header_idx = best_idx
+        # Смугу заголовків перечитуємо з обертанням — для вертикальних заголовків
+        # (рядок хедера + рядок над ним: дворівневий хедер на кшталт «Кількість»).
+        for idx in (header_idx - 1, header_idx):
+            if 0 <= idx < len(cells):
+                cells_text[idx] = [ocr_cell(table_gray, *cell, try_vertical=True) for cell in cells[idx]]
+                sys.stderr.write(f"Header row {idx} (rotated): {cells_text[idx]}\n")
+        col_map = map_columns(cells_text[max(0, header_idx - 1):header_idx + 2])
+        data_start = header_idx + 1
+    elif provided_map:
+        # Сторінка-продовження: заголовка нема, беремо мапінг з 1-ї сторінки
+        header_idx = -1
+        col_map = provided_map
+        data_start = 0
+        sys.stderr.write("No header on page; reusing provided col_map\n")
+    else:
+        # Запасний варіант (як було)
+        header_idx = find_header_row(cells_text)
+        for idx in (header_idx - 1, header_idx):
+            if 0 <= idx < len(cells):
+                cells_text[idx] = [ocr_cell(table_gray, *cell, try_vertical=True) for cell in cells[idx]]
+        col_map = map_columns(cells_text[max(0, header_idx - 1):header_idx + 2])
+        data_start = header_idx + 1
+
+    sys.stderr.write(f"Header idx: {header_idx}, Column map: {col_map}\n")
 
     # 7. Парсимо дані
     records = []
-    current = None
     stop_keywords = ['всього', 'разом', 'підпис', 'матеріально', 'здав', 'прийняв']
 
-    for i in range(header_idx + 1, len(cells_text)):
+    for i in range(data_start, len(cells_text)):
         row = cells_text[i]
         row_text = ' '.join(row).lower()
 
@@ -275,7 +354,7 @@ def extract(input_bytes):
             break
         if not any(c.strip() for c in row):
             continue
-        
+
         digit_cells = sum(1 for c in row if c.strip().isdigit())
         if digit_cells >= len(row) // 2:
           continue
@@ -292,7 +371,7 @@ def extract(input_bytes):
 
     sys.stderr.write(f"Extracted {len(records)} records\n")
     viz_b64 = draw_visualization(table_gray, cells, cells_text, col_map, header_idx)
-    print(json.dumps({'records': records, 'viz': viz_b64}, ensure_ascii=False))
+    print(json.dumps({'records': records, 'viz': viz_b64, 'col_map': col_map}, ensure_ascii=False))
 
 if __name__ == '__main__':
     input_bytes = sys.stdin.buffer.read()

@@ -44,6 +44,16 @@ export function InvoiceImportPage() {
   const importableCount = () =>
     parsedRows.filter(r => r._selected).length
 
+  // Серійні номери рядка (по одному в рядок текстарії)
+  const serialList = (row) =>
+    (row._serials || '').split('\n').map(s => s.trim()).filter(Boolean)
+
+  // Скільки юнітів створиться: за серійниками, інакше за полем «К-ть»
+  const unitCount = (row) => {
+    const s = serialList(row)
+    return s.length || (parseInt(row.quantity) || 1)
+  }
+
   const updateImportBtn = () => {
     const btn = el.querySelector('#import-btn')
     if (!btn) return
@@ -132,7 +142,11 @@ export function InvoiceImportPage() {
 
           try {
             const { rows, viz } = await driveApi.parseInvoice(id)
-            parsedRows = rows.map(r => ({ ...r, _selected: true, quantity: r.qty_sent || 1 }))
+            parsedRows = rows.map(r => {
+              const serials = (r.note || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
+              const qty = serials.length || r.qty_received || r.qty_sent || 1
+              return { ...r, _selected: true, quantity: qty, _serials: serials.join('\n') }
+            })
             vizBase64 = viz || null
 
             if (vizBase64) {
@@ -217,10 +231,11 @@ export function InvoiceImportPage() {
           if (Object.keys(patch).length) await itemsApi.update(target.id, patch)
         }
 
-        const qty = parseInt(row.quantity) || 1
-        for (let i = 0; i < qty; i++) {
+        const serials = serialList(row)
+        const count = serials.length || (parseInt(row.quantity) || 1)
+        for (let i = 0; i < count; i++) {
           await unitsApi.create(target.id, {
-            serial_number: null,
+            serial_number: serials[i] || null,
             status_id: null,
             location_id: null,
             invoice: invoiceLink,
@@ -308,8 +323,21 @@ export function InvoiceImportPage() {
                   </select>
                 </td>
                 <td><input class="unit-inline-input" data-idx="${idx}" data-field="price" value="${row.price || ''}" style="width:80px" type="number" step="0.01" /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="quantity" value="${row.quantity || 1}" style="width:56px" type="number" min="1" /></td>
+                <td style="white-space:nowrap">
+                  <input class="unit-inline-input" data-idx="${idx}" data-field="quantity" value="${row.quantity || 1}" style="width:48px" type="number" min="1" />
+                  <button type="button" class="btn-ghost sn-toggle" data-idx="${idx}" style="padding:3px 6px;font-size:11px" title="Серійні номери">S/N</button>
+                </td>
                 <td id="status-cell-${idx}">${statusCellHtml(row, idx)}</td>
+              </tr>
+              <tr class="sn-editor-row" id="sn-editor-${idx}" style="display:none">
+                <td></td>
+                <td colspan="6" style="background:#f8fafc">
+                  <div style="padding:8px 4px">
+                    <div style="font-size:11px;color:#64748b;margin-bottom:4px">Серійні номери — по одному в рядок. Скільки рядків, стільки одиниць (порожньо → за полем «К-ть»).</div>
+                    <textarea class="sn-textarea" data-idx="${idx}" rows="6" style="width:100%;box-sizing:border-box;font-size:12px;font-family:ui-monospace,monospace;border:1px solid #e2e8f0;border-radius:4px;padding:6px">${esc(row._serials || '')}</textarea>
+                    <div style="font-size:11px;color:#64748b;margin-top:4px">Одиниць: <span class="sn-count" data-idx="${idx}">${unitCount(row)}</span></div>
+                  </div>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -348,6 +376,30 @@ export function InvoiceImportPage() {
     })
 
     parsedRows.forEach((_, idx) => bindStatusCell(idx))
+
+    resultContainer.querySelectorAll('.sn-toggle').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx)
+        const editor = resultContainer.querySelector(`#sn-editor-${idx}`)
+        editor.style.display = editor.style.display === 'none' ? '' : 'none'
+      }
+    })
+
+    resultContainer.querySelectorAll('.sn-textarea').forEach(ta => {
+      ta.oninput = () => {
+        const idx = parseInt(ta.dataset.idx)
+        parsedRows[idx]._serials = ta.value
+        const cnt = resultContainer.querySelector(`.sn-count[data-idx="${idx}"]`)
+        if (cnt) cnt.textContent = unitCount(parsedRows[idx])
+        // Якщо є серійники — вони задають кількість юнітів
+        const serials = serialList(parsedRows[idx])
+        if (serials.length) {
+          parsedRows[idx].quantity = serials.length
+          const q = resultContainer.querySelector(`input[data-field="quantity"][data-idx="${idx}"]`)
+          if (q) q.value = serials.length
+        }
+      }
+    })
   }
 
   const init = async () => {
