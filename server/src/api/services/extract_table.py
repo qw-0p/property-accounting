@@ -173,13 +173,16 @@ def ocr_cell(gray, x1, y1, x2, y2, pad=4, try_vertical=False):
     return ' '.join(text.split())
 
 COLUMN_MAP = [
-    {'field': 'row_no', 'keywords': ['№', 'з/п', 'п/п', 'no']},
+    {'field': 'row_no',             'keywords': ['№', 'з/п', 'п/п', 'no']},
     {'field': 'name', 'keywords': ['назва', 'найменування', 'newn', 'нева', 'група']},
 	{'field': 'nomenclature_code', 'keywords': ['код', 'номенклатур', 'поменклатур', 'помейклатур', 'koa']},
     {'field': 'price', 'keywords': ['ціна', 'вартість за', 'одиницю', 'вартість одн', 'інь']},
-    {'field': 'unit', 'keywords': ['одиниц', 'виміру', 'измер']},
-    {'field': 'qty_sent', 'keywords': ['відправлено', 'вимагається']},
-    {'field': 'note', 'keywords': ['примітка']},
+    {'field': 'unit',               'keywords': ['одиниц', 'виміру', 'измер']},
+    {'field': 'category',           'keywords': ['категор', 'сорт']},
+    {'field': 'qty_sent',           'keywords': ['відправлено', 'вимагається']},
+    {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло', 'відпущено']},
+    {'field': 'total',              'keywords': ['сума']},
+    {'field': 'note',               'keywords': ['примітка']},
 ]
 
 def map_columns(header_rows):
@@ -204,7 +207,8 @@ def map_columns(header_rows):
                 break
     return col_map
 
-HEADER_KEYWORDS = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур', 'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
+HEADER_KEYWORDS = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур',
+                   'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
 
 def header_score(row):
     row_text = ' '.join(row).lower()
@@ -405,12 +409,15 @@ def extract(input_bytes):
 
 def extract_manual(png_bytes, grid):
     """OCR за заданою вручну сіткою: колонки (x1,x2,field) + row_lines (y-межі).
-    Зображення — вже вирізана таблиця (та сама, що віддано на кроці 1)."""
+    Вхід — ПОВНА сторінка (як в авто-режимі); кроп відтворюється тим самим
+    find_table_region, тож координати сітки збігаються з кроком 1."""
     nparr = np.frombuffer(png_bytes, np.uint8)
-    gray = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
-    if gray is None:
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
         print(json.dumps({'records': [], 'viz': None}))
         return
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray, _, _ = find_table_region(gray)
 
     columns = grid.get('columns', [])
     row_lines = sorted(int(y) for y in grid.get('row_lines', []))

@@ -316,9 +316,10 @@ export function InvoiceImportPage() {
         const resultContainer = el.querySelector('#parsed-result')
         resultContainer.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ Перечитую за новою розміткою...</span>'
         try {
-          const resp = await driveApi.parseManual({ image: p.grid.image, grid: newGrid })
+          const resp = await driveApi.parseManual({ file_id: fileId, page: p.page, grid: newGrid })
           const newRows = (resp.rows || []).map(r => rowFromRecord(r, p.page))
           parsedRows = parsedRows.filter(r => r._page !== p.page).concat(newRows)
+          parsedRows.sort((a, b) => (a._page ?? 1e9) - (b._page ?? 1e9))
           await Promise.all(newRows.map(lookupRow))
           renderParsedRows(resultContainer)
         } catch (e) {
@@ -386,7 +387,7 @@ export function InvoiceImportPage() {
             ${parsedRows.map((row, idx) => `
               <tr>
                 <td><input type="checkbox" class="parsed-row-check" data-idx="${idx}" ${row._selected ? 'checked' : ''} /></td>
-                <td><textarea class="unit-inline-input" data-idx="${idx}" data-field="name" style="width:170px">${esc(row.name || '')}</textarea></td>
+                <td><input class="unit-inline-input" data-idx="${idx}" data-field="name" value="${esc(row.name || '')}" style="width:170px" /></td>
                 <td><input class="unit-inline-input" data-idx="${idx}" data-field="nomenclature_code" value="${esc(row.nomenclature_code || '')}" style="width:100px" /></td>
                 <td>
                   <select class="unit-inline-select" data-idx="${idx}" data-field="unit">

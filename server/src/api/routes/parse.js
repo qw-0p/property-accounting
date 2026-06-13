@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const { google } = require('googleapis')
-const { extractTableRows, extractManual } = require('../services/invoice-parser')
+const { extractTableRows, extractManualPage } = require('../services/invoice-parser')
 
 const num = s => {
 	const c = String(s || '').replace(/\s/g, '')
@@ -37,11 +37,32 @@ function normalizeRow(row) {
 		if (f in out) out[f] = num(out[f])
 	}
 
+	const page = out._page
 	for (const k of Object.keys(out)) {
 		if (out[k] === null || out[k] === undefined || out[k] === '') delete out[k]
 	}
+	if (page !== undefined) out._page = page
 
 	return out
+}
+
+function driveClient(access_token) {
+	const client = new google.auth.OAuth2(
+		process.env.GOOGLE_CLIENT_ID,
+		process.env.GOOGLE_SECRET,
+		process.env.GOOGLE_REDIRECT_URI
+	)
+	client.setCredentials({ access_token })
+	return google.drive({ version: 'v3', auth: client })
+}
+
+async function fetchDriveFile(access_token, file_id) {
+	const drive = driveClient(access_token)
+	const { data } = await drive.files.get(
+		{ fileId: file_id, alt: 'media' },
+		{ responseType: 'arraybuffer' }
+	)
+	return Buffer.from(data)
 }
 
 router.post('/invoice', async (req, res, next) => {
@@ -51,19 +72,8 @@ router.post('/invoice', async (req, res, next) => {
 		if (!file_id) return res.status(400).json({ message: 'file_id required' })
 		if (!access_token) return res.status(401).json({ message: 'No token' })
 
-		const client = new google.auth.OAuth2(
-			process.env.GOOGLE_CLIENT_ID,
-			process.env.GOOGLE_SECRET,
-			process.env.GOOGLE_REDIRECT_URI
-		)
-		client.setCredentials({ access_token })
-		const drive = google.drive({ version: 'v3', auth: client })
-
-		const { data } = await drive.files.get(
-			{ fileId: file_id, alt: 'media' },
-			{ responseType: 'arraybuffer' }
-		)
-		const { rows: cells, viz, pages } = await extractTableRows(Buffer.from(data))
+		const buffer = await fetchDriveFile(access_token, file_id)
+		const { rows: cells, viz, pages } = await extractTableRows(buffer)
 		const rows = cells.map(normalizeRow).filter(r => r.name || r.nomenclature_code)
 
 		console.log('parsed rows:', rows.length)
@@ -75,14 +85,16 @@ router.post('/invoice', async (req, res, next) => {
 })
 
 // Ручний ре-парсинг сторінки за відредагованою сіткою.
-// body: { image: <base64 png таблиці>, grid: { columns, row_lines, header_bottom } }
+// body: { file_id, page, grid }. Фото не передається — сервер рендерить сторінку сам.
 router.post('/invoice/manual', async (req, res, next) => {
 	try {
-		const { image, grid } = req.body
-		if (!image || !grid) return res.status(400).json({ message: 'image and grid required' })
+		const { file_id, page, grid } = req.body
+		const access_token = req.headers.authorization?.replace('Bearer ', '')
+		if (!file_id || !grid) return res.status(400).json({ message: 'file_id and grid required' })
+		if (!access_token) return res.status(401).json({ message: 'No token' })
 
-		const pngBuffer = Buffer.from(image, 'base64')
-		const { rows: cells, viz } = await extractManual(pngBuffer, grid)
+		const buffer = await fetchDriveFile(access_token, file_id)
+		const { rows: cells, viz } = await extractManualPage(buffer, page || 1, grid)
 		const rows = cells.map(normalizeRow).filter(r => r.name || r.nomenclature_code)
 
 		res.json({ rows, viz })
