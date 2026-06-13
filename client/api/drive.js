@@ -61,5 +61,13 @@ export const driveApi = {
 			body: JSON.stringify({ file_id: fileId }),
 		})
 		return res.json()
-	},
+  },
+  parseManual: async ({ image, grid }) => {
+    const res = await fetchWithAuth(`${BASE_URL}/parse/invoice/manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, grid }),
+    })
+    return res.json()
+  },
 }

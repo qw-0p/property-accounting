@@ -1,0 +1,225 @@
+/* client/styles/grid-editor.css */
+
+.grid-editor-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.6);
+	z-index: 2000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.grid-editor {
+	background: #fff;
+	border-radius: 10px;
+	width: 95vw;
+	max-width: 1120px;
+	max-height: 92vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.ge-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	border-bottom: 1px solid #e2e8f0;
+	flex-wrap: wrap;
+}
+
+.ge-toolbar button,
+.ge-toolbar select {
+	padding: 6px 10px;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+/* Легенда колонок над зображенням */
+.ge-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 10px 12px;
+	border-bottom: 1px solid #f1f5f9;
+}
+
+.ge-legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px 3px 4px;
+	border: 1px solid #e2e8f0;
+	border-radius: 999px;
+	background: #f8fafc;
+}
+
+.ge-chip {
+	width: 14px;
+	height: 14px;
+	border-radius: 4px;
+	flex: 0 0 auto;
+}
+
+.ge-legend-field {
+	border: none;
+	background: transparent;
+	font-size: 13px;
+	cursor: pointer;
+	outline: none;
+}
+
+.ge-legend-del {
+	cursor: pointer;
+	color: #ef4444;
+	font-weight: 700;
+	padding: 0 2px;
+	user-select: none;
+}
+
+.ge-hint {
+	font-size: 11px;
+	color: #94a3b8;
+	padding: 6px 12px 0;
+}
+
+.ge-scroll {
+	overflow: auto;
+	padding: 12px;
+	background: #f1f5f9;
+}
+
+.ge-stage {
+	position: relative;
+	user-select: none;
+}
+
+.ge-layer {
+	position: absolute;
+	inset: 0;
+}
+
+/* Колонка */
+.ge-col {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	border-left: 1px solid;
+	border-right: 1px solid;
+	box-sizing: border-box;
+}
+
+.ge-col-hl {
+	outline: 2px solid #1e293b;
+	z-index: 5;
+}
+
+/* Краї всередині смуги, біля межі — у сусідів не налазять */
+.ge-handle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 16px;
+	cursor: ew-resize;
+}
+
+.ge-handle::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 4px;
+	background: currentColor;
+	opacity: 0.5;
+}
+
+.ge-handle:hover::before {
+	opacity: 1;
+}
+.ge-handle:hover {
+	z-index: 10;
+}
+
+.ge-handle-l {
+	left: 0;
+}
+.ge-handle-l::before {
+	left: 0;
+}
+
+.ge-handle-r {
+	right: 0;
+}
+.ge-handle-r::before {
+	right: 0;
+}
+
+/* Горизонтальні лінії рядків */
+.ge-row-wrap {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 16px;
+	transform: translateY(-8px);
+	cursor: ns-resize;
+}
+
+.ge-row-line {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 8px;
+	border-top: 2px solid #1e293b;
+}
+
+.ge-row-wrap:hover .ge-row-line {
+	border-top-color: #2563eb;
+}
+
+.ge-row-del {
+	position: absolute;
+	right: 4px;
+	top: -2px;
+	width: 18px;
+	height: 18px;
+	border-radius: 4px;
+	background: #ef4444;
+	color: #fff;
+	font-size: 12px;
+	line-height: 18px;
+	text-align: center;
+	cursor: pointer;
+	user-select: none;
+}
+
+/* Межа заголовок / дані */
+.ge-header-wrap {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 16px;
+	transform: translateY(-8px);
+	cursor: ns-resize;
+}
+
+.ge-header-line {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 8px;
+	border-top: 2px dashed #ef4444;
+}
+
+.ge-header-tag {
+	position: absolute;
+	right: 0;
+	top: -8px;
+	font-size: 10px;
+	color: #ef4444;
+	background: #fff;
+	padding: 0 4px;
+}

@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const { google } = require('googleapis')
-const { extractTableRows } = require('../services/invoice-parser')
+const { extractTableRows, extractManual } = require('../services/invoice-parser')
 
 const num = s => {
 	const c = String(s || '').replace(/\s/g, '')
@@ -11,14 +11,12 @@ const num = s => {
 
 const NUMERIC_FIELDS = ['price', 'qty_sent', 'qty_received', 'qty_disposed', 'qty_available', 'total']
 
-// Прибираємо рядки що складаються переважно з OCR-сміття
 function cleanText(s) {
 	if (!s) return null
 	const str = s.trim()
 	if (!str) return null
 	const letters = (str.match(/[\p{L}\d]/gu) || []).length
 	if (str.length > 5 && letters / str.length < 0.4) return null
-	// Прибираємо зайві символи з країв
 	return str.replace(/^[|\-\s\/\\]+|[|\-\s\/\\]+$/g, '').trim() || null
 }
 
@@ -27,7 +25,6 @@ function normalizeRow(row) {
 	delete out._partial
 	delete out.row_no
 
-	// Очищаємо текстові поля
 	for (const k of ['name', 'nomenclature_code', 'unit']) {
 		out[k] = cleanText(out[k])
 	}
@@ -36,13 +33,10 @@ function normalizeRow(row) {
 		const cleaned = out.nomenclature_code.replace(/[^\d\-\/\.]/g, '').trim()
 		out.nomenclature_code = (cleaned && /\d/.test(cleaned)) ? cleaned : null
 	}
-	// Числові поля
 	for (const f of NUMERIC_FIELDS) {
 		if (f in out) out[f] = num(out[f])
 	}
-	if (out.price !== undefined) out.price = num(out.price)
 
-	// Прибираємо null поля
 	for (const k of Object.keys(out)) {
 		if (out[k] === null || out[k] === undefined || out[k] === '') delete out[k]
 	}
@@ -69,15 +63,31 @@ router.post('/invoice', async (req, res, next) => {
 			{ fileId: file_id, alt: 'media' },
 			{ responseType: 'arraybuffer' }
 		)
-		const { rows: cells, viz } = await extractTableRows(Buffer.from(data))
-		const rows = cells
-				.map(normalizeRow)
-				.filter(r => r.name || r.nomenclature_code)
+		const { rows: cells, viz, pages } = await extractTableRows(Buffer.from(data))
+		const rows = cells.map(normalizeRow).filter(r => r.name || r.nomenclature_code)
 
 		console.log('parsed rows:', rows.length)
-		res.json({ rows, file_id, viz })
+		res.json({ rows, file_id, viz, pages })
 	} catch (e) {
 		console.error('Parse error:', e.message)
+		next(e)
+	}
+})
+
+// Ручний ре-парсинг сторінки за відредагованою сіткою.
+// body: { image: <base64 png таблиці>, grid: { columns, row_lines, header_bottom } }
+router.post('/invoice/manual', async (req, res, next) => {
+	try {
+		const { image, grid } = req.body
+		if (!image || !grid) return res.status(400).json({ message: 'image and grid required' })
+
+		const pngBuffer = Buffer.from(image, 'base64')
+		const { rows: cells, viz } = await extractManual(pngBuffer, grid)
+		const rows = cells.map(normalizeRow).filter(r => r.name || r.nomenclature_code)
+
+		res.json({ rows, viz })
+	} catch (e) {
+		console.error('Manual parse error:', e.message)
 		next(e)
 	}
 })

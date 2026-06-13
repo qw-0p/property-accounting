@@ -3,8 +3,15 @@ import { unitsApi } from '../api/units.js'
 import { dictApi } from '../api/dict.js'
 import { driveApi } from '../api/drive.js'
 import { DrivePicker } from '../components/drive-picker.js'
+import { openGridEditor } from '../components/grid-editor.js'
 
 const esc = (s) => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
+const rowFromRecord = (r, page) => {
+  const serials = (r.note || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
+  const qty = serials.length || r.qty_received || r.qty_sent || 1
+  return { ...r, _page: page, _selected: true, quantity: qty, _serials: serials.join('\n') }
+}
 
 export function InvoiceImportPage() {
   const el = document.createElement('div')
@@ -17,6 +24,7 @@ export function InvoiceImportPage() {
   let parsedRows = []
   let vizBase64 = null
   let fileId = null
+  let pages = [] // [{ page, records, grid }]
 
   // Статус рядка після lookup:
   //   _status: 'new' | 'exact' | 'conflict'
@@ -141,12 +149,10 @@ export function InvoiceImportPage() {
           resultContainer.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ Розпізнаю рядки...</span>'
 
           try {
-            const { rows, viz } = await driveApi.parseInvoice(id)
-            parsedRows = rows.map(r => {
-              const serials = (r.note || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
-              const qty = serials.length || r.qty_received || r.qty_sent || 1
-              return { ...r, _selected: true, quantity: qty, _serials: serials.join('\n') }
-            })
+            const resp = await driveApi.parseInvoice(id)
+            const { rows, viz } = resp
+            pages = resp.pages || []
+            parsedRows = rows.map(r => rowFromRecord(r, r._page))
             vizBase64 = viz || null
 
             if (vizBase64) {
@@ -186,11 +192,12 @@ export function InvoiceImportPage() {
         return
       }
 
-      // Одиниця виміру обовʼязкова лише для рядків, що створять НОВИЙ item
+      // Одиниця виміру обовʼязкова для нових позицій — і має бути зі списку (інакше сервер відхилить)
       const willCreate = (r) => r._status === 'new' || (r._status === 'conflict' && r._resolution === 'new')
-      const missingUnit = selected.filter(r => willCreate(r) && !r.unit)
+      const resolveUom = (r) => unitsOfMeasure.find(u => u.name === r.unit)
+      const missingUnit = selected.filter(r => willCreate(r) && !resolveUom(r))
       if (missingUnit.length) {
-        alert(`Оберіть одиницю виміру для нових позицій:\n${missingUnit.map(r => r.name || '(без назви)').join('\n')}`)
+        alert(`Оберіть одиницю виміру зі списку для нових позицій:\n${missingUnit.map(r => `${r.name || '(без назви)'}${r.unit ? ` (зараз: «${r.unit}» — нема в довіднику)` : ''}`).join('\n')}`)
         return
       }
       if (selected.some(willCreate) && !serviceId) {
@@ -203,44 +210,54 @@ export function InvoiceImportPage() {
 
       const invoiceLink = `https://drive.google.com/file/d/${fileId}/view`
 
-      for (const row of selected) {
-        const uom = unitsOfMeasure.find(u => u.name === row.unit)
+      try {
+        for (const row of selected) {
+          const uom = resolveUom(row)
 
-        // Визначаємо item, у який лити units
-        let target = null
-        if (row._status === 'exact') target = row._lookup.exact
-        else if (row._status === 'conflict' && row._resolution !== 'new') {
-          target = row._lookup.conflicts.find(c => c.id === row._resolution)
-        }
+          // Визначаємо item, у який лити units
+          let target = null
+          if (row._status === 'exact') target = row._lookup.exact
+          else if (row._status === 'conflict' && row._resolution !== 'new') {
+            target = row._lookup.conflicts.find(c => c.id === row._resolution)
+          }
 
-        if (!target) {
-          target = await itemsApi.create({
-            name: row.name || '—',
-            invoice_name: row.name || null,
-            nomenclature_code: row.nomenclature_code || null,
-            unit_of_measure_id: uom?.id || null,
-            price: row.price || null,
-            service_id: serviceId,
-          })
-        } else {
-          // Дописуємо відсутні дані в наявний item
-          const patch = {}
-          if (!target.nomenclature_code && row.nomenclature_code) patch.nomenclature_code = row.nomenclature_code
-          if ((target.price === null || target.price === '' || target.price === undefined) && row.price) patch.price = row.price
-          if (!target.unit_of_measure_id && uom) patch.unit_of_measure_id = uom.id
-          if (Object.keys(patch).length) await itemsApi.update(target.id, patch)
-        }
+          if (!target) {
+            target = await itemsApi.create({
+              name: row.name || '—',
+              invoice_name: row.name || null,
+              nomenclature_code: row.nomenclature_code || null,
+              unit_of_measure_id: uom?.id || null,
+              price: row.price || null,
+              service_id: serviceId,
+            })
+            if (!target || !target.id) throw new Error(target?.message || 'Не вдалося створити позицію')
+          } else {
+            // Дописуємо відсутні дані в наявний item
+            const patch = {}
+            if (!target.nomenclature_code && row.nomenclature_code) patch.nomenclature_code = row.nomenclature_code
+            if ((target.price === null || target.price === '' || target.price === undefined) && row.price) patch.price = row.price
+            if (!target.unit_of_measure_id && uom) patch.unit_of_measure_id = uom.id
+            if (Object.keys(patch).length) await itemsApi.update(target.id, patch)
+          }
 
-        const serials = serialList(row)
-        const count = serials.length || (parseInt(row.quantity) || 1)
-        for (let i = 0; i < count; i++) {
-          await unitsApi.create(target.id, {
-            serial_number: serials[i] || null,
-            status_id: null,
-            location_id: null,
-            invoice: invoiceLink,
-          })
+          const serials = serialList(row)
+          const count = serials.length || (parseInt(row.quantity) || 1)
+          for (let i = 0; i < count; i++) {
+            const u = await unitsApi.create(target.id, {
+              serial_number: serials[i] || null,
+              status_id: null,
+              location_id: null,
+              invoice: invoiceLink,
+            })
+            if (!u || !u.id) throw new Error(u?.message || 'Не вдалося створити одиницю')
+          }
         }
+      } catch (e) {
+        console.error('import error:', e)
+        alert('Помилка імпорту: ' + (e?.message || e))
+        importBtn.disabled = false
+        importBtn.textContent = `Імпортувати (${importableCount()})`
+        return
       }
 
       location.hash = '#/items'
@@ -288,15 +305,70 @@ export function InvoiceImportPage() {
     }
   }
 
+  // Відкрити редактор сітки для сторінки й перечитати її за новою розміткою
+  const reparsePage = (p) => {
+    if (!p || !p.grid || !p.grid.image) return
+    openGridEditor({
+      image: p.grid.image,
+      grid: p.grid,
+      onApply: async (newGrid) => {
+        p.grid = { ...p.grid, ...newGrid }
+        const resultContainer = el.querySelector('#parsed-result')
+        resultContainer.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ Перечитую за новою розміткою...</span>'
+        try {
+          const resp = await driveApi.parseManual({ image: p.grid.image, grid: newGrid })
+          const newRows = (resp.rows || []).map(r => rowFromRecord(r, p.page))
+          parsedRows = parsedRows.filter(r => r._page !== p.page).concat(newRows)
+          await Promise.all(newRows.map(lookupRow))
+          renderParsedRows(resultContainer)
+        } catch (e) {
+          console.error('manual reparse error:', e)
+          renderParsedRows(resultContainer)
+        }
+      },
+    })
+  }
+
+  const addManualRow = () => {
+    parsedRows.push({
+      name: '', nomenclature_code: '', unit: '', price: '', quantity: 1,
+      _serials: '', _selected: true, _page: null,
+      _status: 'new', _lookup: { exact: null, conflicts: [] }, _resolution: null,
+    })
+    renderParsedRows(el.querySelector('#parsed-result'))
+  }
+
+  const toolbarHtml = () => {
+    const reparse = pages.filter(p => p.grid && p.grid.image)
+      .map(p => `<button type="button" class="btn-ghost ge-open" data-page="${p.page}" style="padding:4px 8px;font-size:12px">✏️ Розмітка${pages.length > 1 ? ` (стор. ${p.page})` : ''}</button>`)
+      .join('')
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+      ${reparse ? `<span style="font-size:11px;color:#64748b">Не так розпізналось?</span>${reparse}` : ''}
+      <button type="button" class="btn-ghost" id="add-row-btn" style="padding:4px 8px;font-size:12px">+ Додати рядок вручну</button>
+    </div>`
+  }
+
+  const bindToolbar = (resultContainer) => {
+    resultContainer.querySelectorAll('.ge-open').forEach(btn => {
+      btn.onclick = () => reparsePage(pages.find(p => p.page === +btn.dataset.page))
+    })
+    const add = resultContainer.querySelector('#add-row-btn')
+    if (add) add.onclick = addManualRow
+  }
+
   const renderParsedRows = (resultContainer) => {
+    updateImportBtn()
+
     if (!parsedRows.length) {
-      resultContainer.innerHTML = '<span style="color:#ef4444;font-size:13px">Не вдалось знайти рядки в PDF</span>'
+      resultContainer.innerHTML = toolbarHtml() +
+        '<div style="color:#94a3b8;font-size:13px">Рядків не знайдено. Можна додати вручну.</div>'
+      bindToolbar(resultContainer)
       return
     }
 
-    updateImportBtn()
+    const reparseBar = toolbarHtml()
 
-    resultContainer.innerHTML = `
+    resultContainer.innerHTML = reparseBar + `
       <div class="parsed-table-wrap">
         <table class="parsed-table">
           <thead>
@@ -314,7 +386,7 @@ export function InvoiceImportPage() {
             ${parsedRows.map((row, idx) => `
               <tr>
                 <td><input type="checkbox" class="parsed-row-check" data-idx="${idx}" ${row._selected ? 'checked' : ''} /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="name" value="${esc(row.name || '')}" style="width:170px" /></td>
+                <td><textarea class="unit-inline-input" data-idx="${idx}" data-field="name" style="width:170px">${esc(row.name || '')}</textarea></td>
                 <td><input class="unit-inline-input" data-idx="${idx}" data-field="nomenclature_code" value="${esc(row.nomenclature_code || '')}" style="width:100px" /></td>
                 <td>
                   <select class="unit-inline-select" data-idx="${idx}" data-field="unit">
@@ -376,6 +448,8 @@ export function InvoiceImportPage() {
     })
 
     parsedRows.forEach((_, idx) => bindStatusCell(idx))
+
+    bindToolbar(resultContainer)
 
     resultContainer.querySelectorAll('.sn-toggle').forEach(btn => {
       btn.onclick = () => {

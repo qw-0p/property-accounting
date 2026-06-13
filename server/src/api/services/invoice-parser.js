@@ -4,16 +4,13 @@ const path = require('path')
 
 const EXTRACT_SCRIPT = path.join(__dirname, 'extract_table.py')
 
-function runExtract(png, colMap) {
+// Асинхронний запуск python. env — додаткові змінні (COL_MAP_JSON / MANUAL_GRID_JSON).
+function runPython(png, extraEnv) {
 	return new Promise((resolve, reject) => {
-		const env = colMap
-			? { ...process.env, COL_MAP_JSON: JSON.stringify(colMap) }
-			: process.env
-
+		const env = extraEnv ? { ...process.env, ...extraEnv } : process.env
 		const proc = spawn('python3', [EXTRACT_SCRIPT], { timeout: 300000, env })
 		const out = []
 		const err = []
-
 		proc.stdout.on('data', d => out.push(d))
 		proc.stderr.on('data', d => err.push(d))
 		proc.on('error', reject)
@@ -27,31 +24,41 @@ function runExtract(png, colMap) {
 				reject(e)
 			}
 		})
-
 		proc.stdin.write(png)
 		proc.stdin.end()
 	})
 }
 
+// Авто-розбір усіх сторінок. Повертає агреговані рядки + сітку кожної сторінки.
 async function extractTableRows(buffer) {
 	const pages = await renderPdfToPngs(buffer, 3)
 	const allRows = []
 	let vizBase64 = null
 	let sharedColMap = null
+	const pageInfos = []
 
 	for (const { page, png } of pages) {
 		try {
-			const { records, viz, col_map } = await runExtract(png, sharedColMap)
+			const env = sharedColMap ? { COL_MAP_JSON: JSON.stringify(sharedColMap) } : null
+			const { records, viz, col_map, grid } = await runPython(png, env)
 			if (col_map && !sharedColMap) sharedColMap = col_map
-			allRows.push(...records)
+			allRows.push(...records.map(r => ({ ...r, _page: page })))
 			if (viz && !vizBase64) vizBase64 = viz
+			pageInfos.push({ page, records, grid })
 		} catch (e) {
 			console.error(`Extract error (page ${page}):`, e.message)
 		}
 	}
 
 	console.log(`Extracted ${allRows.length} rows total`)
-	return { rows: allRows, viz: vizBase64 }
+	return { rows: allRows, viz: vizBase64, pages: pageInfos }
 }
 
-module.exports = { extractTableRows }
+// Ручний ре-парсинг однієї сторінки за заданою сіткою.
+// pngBuffer — те саме зображення таблиці (grid.image), що віддали на кроці 1.
+async function extractManual(pngBuffer, grid) {
+	const { records, viz } = await runPython(pngBuffer, { MANUAL_GRID_JSON: JSON.stringify(grid) })
+	return { rows: records, viz }
+}
+
+module.exports = { extractTableRows, extractManual }

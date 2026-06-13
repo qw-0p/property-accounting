@@ -9,6 +9,7 @@ Extract table from invoice image using OpenCV cell detection + pytesseract OCR.
 """
 import sys
 import json
+import base64
 import cv2
 import numpy as np
 import pytesseract
@@ -172,16 +173,13 @@ def ocr_cell(gray, x1, y1, x2, y2, pad=4, try_vertical=False):
     return ' '.join(text.split())
 
 COLUMN_MAP = [
-    {'field': 'row_no',             'keywords': ['№', 'з/п', 'п/п', 'no']},
+    {'field': 'row_no', 'keywords': ['№', 'з/п', 'п/п', 'no']},
     {'field': 'name', 'keywords': ['назва', 'найменування', 'newn', 'нева', 'група']},
 	{'field': 'nomenclature_code', 'keywords': ['код', 'номенклатур', 'поменклатур', 'помейклатур', 'koa']},
     {'field': 'price', 'keywords': ['ціна', 'вартість за', 'одиницю', 'вартість одн', 'інь']},
-    {'field': 'unit',               'keywords': ['одиниц', 'виміру', 'измер']},
-    {'field': 'category',           'keywords': ['категор', 'сорт']},
-    {'field': 'qty_sent',           'keywords': ['відправлено', 'вимагається']},
-    {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло', 'відпущено']},
-    {'field': 'total',              'keywords': ['сума']},
-    {'field': 'note',               'keywords': ['примітка']},
+    {'field': 'unit', 'keywords': ['одиниц', 'виміру', 'измер']},
+    {'field': 'qty_sent', 'keywords': ['відправлено', 'вимагається']},
+    {'field': 'note', 'keywords': ['примітка']},
 ]
 
 def map_columns(header_rows):
@@ -206,8 +204,7 @@ def map_columns(header_rows):
                 break
     return col_map
 
-HEADER_KEYWORDS = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур',
-                   'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
+HEADER_KEYWORDS = ['назва', 'найменування', 'код', 'номенклатур', 'поменклатур', 'одиниц', 'виміру', 'ціна', 'вартість', 'сума']
 
 def header_score(row):
     row_text = ' '.join(row).lower()
@@ -355,9 +352,15 @@ def extract(input_bytes):
         if not any(c.strip() for c in row):
             continue
 
-        digit_cells = sum(1 for c in row if c.strip().isdigit())
-        if digit_cells >= len(row) // 2:
-          continue
+        # Рядок-нумерація колонок: у комірці «назви» коротке число (1,2,…),
+        # або всі непорожні комірки — короткі числа. Позиції з кількістю 1 не чіпає.
+        name_idx = next((j for j, f in col_map.items() if f == 'name'), None)
+        name_cell = row[name_idx].strip() if (name_idx is not None and name_idx < len(row)) else ''
+        nonempty = [c.strip() for c in row if c.strip()]
+        is_number_row = (name_cell.isdigit() and len(name_cell) <= 2) or \
+                        (bool(nonempty) and all(c.isdigit() and len(c) <= 2 for c in nonempty))
+        if is_number_row:
+            continue
 
         # Перший стовпець — номер рядка
         record = {}
@@ -371,8 +374,96 @@ def extract(input_bytes):
 
     sys.stderr.write(f"Extracted {len(records)} records\n")
     viz_b64 = draw_visualization(table_gray, cells, cells_text, col_map, header_idx)
-    print(json.dumps({'records': records, 'viz': viz_b64, 'col_map': col_map}, ensure_ascii=False))
+
+    # Сітка для ручного редактора: зображення вирізаної таблиці + колонки + горизонтальні межі.
+    rep = None
+    if 0 <= data_start < len(cells):
+        rep = cells[data_start]
+    elif 0 <= header_idx < len(cells):
+        rep = cells[header_idx]
+    elif cells:
+        rep = cells[0]
+
+    columns = []
+    if rep:
+        for j, (x1, y1, x2, y2) in enumerate(rep):
+            columns.append({'x1': int(x1), 'x2': int(x2), 'field': col_map.get(j)})
+
+    row_lines = sorted(set([0] + [int(p) for p in h_pos] + [int(img_h)]))
+    _, enc = cv2.imencode('.png', table_gray)
+    grid = {
+        'image': base64.b64encode(enc.tobytes()).decode('utf-8'),
+        'width': int(img_w),
+        'height': int(img_h),
+        'columns': columns,
+        'row_lines': row_lines,
+        'header_bottom': int(rep[0][1]) if rep else 0,
+    }
+
+    print(json.dumps({'records': records, 'viz': viz_b64, 'col_map': col_map, 'grid': grid}, ensure_ascii=False))
+
+
+def extract_manual(png_bytes, grid):
+    """OCR за заданою вручну сіткою: колонки (x1,x2,field) + row_lines (y-межі).
+    Зображення — вже вирізана таблиця (та сама, що віддано на кроці 1)."""
+    nparr = np.frombuffer(png_bytes, np.uint8)
+    gray = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        print(json.dumps({'records': [], 'viz': None}))
+        return
+
+    columns = grid.get('columns', [])
+    row_lines = sorted(int(y) for y in grid.get('row_lines', []))
+    header_bottom = int(grid.get('header_bottom', 0))
+
+    cells, cells_text, records = [], [], []
+    stop_keywords = ['всього', 'разом', 'підпис', 'матеріально', 'здав', 'прийняв']
+    col_map = {j: c.get('field') for j, c in enumerate(columns) if c.get('field')}
+
+    for r in range(len(row_lines) - 1):
+        y1, y2 = row_lines[r], row_lines[r + 1]
+        if y2 - y1 < 8:
+            continue
+        # Смуги вище межі «заголовок/дані» — не дані
+        if (y1 + y2) / 2 < header_bottom:
+            continue
+        row_cells, row_text, record = [], [], {}
+        for col in columns:
+            x1, x2 = int(col['x1']), int(col['x2'])
+            field = col.get('field')
+            txt = ocr_cell(gray, x1, y1, x2, y2)
+            row_cells.append((x1, y1, x2, y2))
+            row_text.append(txt)
+            if field and field != 'row_no' and txt.strip():
+                record[field] = txt.strip()
+
+        cells.append(row_cells)
+        cells_text.append(row_text)
+
+        joined = ' '.join(row_text).lower()
+        if any(k in joined for k in stop_keywords):
+            continue
+        # Рядок-нумерація колонок: у комірці «назви» коротке число, або всі — короткі числа
+        name_idx = next((j for j, f in col_map.items() if f == 'name'), None)
+        name_cell = row_text[name_idx].strip() if (name_idx is not None and name_idx < len(row_text)) else ''
+        nonempty = [c.strip() for c in row_text if c.strip()]
+        is_number_row = (name_cell.isdigit() and len(name_cell) <= 2) or \
+                        (bool(nonempty) and all(c.isdigit() and len(c) <= 2 for c in nonempty))
+        if is_number_row:
+            continue
+        if record.get('name') or record.get('nomenclature_code'):
+            records.append(record)
+
+    viz_b64 = draw_visualization(gray, cells, cells_text, col_map, -1) if cells else None
+    sys.stderr.write(f"Manual: {len(records)} records from {len(columns)} cols x {len(row_lines)-1} rows\n")
+    print(json.dumps({'records': records, 'viz': viz_b64}, ensure_ascii=False))
+
 
 if __name__ == '__main__':
+    import os
     input_bytes = sys.stdin.buffer.read()
-    extract(input_bytes)
+    manual = os.environ.get('MANUAL_GRID_JSON')
+    if manual:
+        extract_manual(input_bytes, json.loads(manual))
+    else:
+        extract(input_bytes)
