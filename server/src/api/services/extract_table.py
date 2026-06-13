@@ -228,10 +228,7 @@ COLUMN_MAP = [
 	{'field': 'nomenclature_code', 'keywords': ['код', 'номенклатур', 'поменклатур', 'помейклатур', 'koa']},
     {'field': 'price', 'keywords': ['ціна', 'вартість за', 'одиницю', 'вартість одн', 'інь']},
     {'field': 'unit',               'keywords': ['одиниц', 'виміру', 'измер']},
-    {'field': 'category',           'keywords': ['категор', 'сорт']},
     {'field': 'qty_sent',           'keywords': ['відправлено', 'вимагається']},
-    {'field': 'qty_received',       'keywords': ['прийнято', 'надійшло', 'відпущено']},
-    {'field': 'total',              'keywords': ['сума']},
     {'field': 'note',               'keywords': ['примітка']},
 ]
 

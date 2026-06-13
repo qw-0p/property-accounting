@@ -6,9 +6,7 @@
 // Координати зберігаються в пікселях ОРИГІНАЛЬНОГО зображення таблиці.
 
 const FIELDS = [
-  ['row_no', '№'], ['name', 'Назва'], ['nomenclature_code', 'КН'], ['unit', 'Од.'],
-  ['category', 'Категорія'], ['price', 'Ціна'], ['qty_sent', 'Відправлено'],
-  ['qty_received', 'Прийнято'], ['total', 'Сума'], ['note', 'Примітка'],
+  ['row_no', '№'], ['name', 'Назва'], ['nomenclature_code', 'КН'], ['unit', 'Од.'], ['price', 'Ціна'], ['qty_sent', 'Відправлено'], ['note', 'Примітка'],
 ]
 const FIELD_COLORS = {
   row_no: '#c8c8c8', name: '#ffb232', nomenclature_code: '#32cd32', unit: '#3296ff',

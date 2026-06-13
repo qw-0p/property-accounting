@@ -283,7 +283,7 @@ export function InvoiceImportPage() {
     return `
       <select class="unit-inline-select conflict-resolve" data-idx="${idx}" style="border-color:#f59e0b">
         <option value="" ${!row._resolution ? 'selected' : ''}>⚠️ оберіть…</option>
-        <option value="new" ${row._resolution === 'new' ? 'selected' : ''}>створити нове</option>
+        <option value="new" ${row._resolution === 'new' ? 'selected' : ''}>Створити нове</option>
         ${opts}
       </select>
     `
@@ -405,7 +405,7 @@ export function InvoiceImportPage() {
             ${parsedRows.map((row, idx) => `
               <tr>
                 <td><input type="checkbox" class="parsed-row-check" data-idx="${idx}" ${row._selected ? 'checked' : ''} /></td>
-                <td><input class="unit-inline-input" data-idx="${idx}" data-field="name" value="${esc(row.name || '')}" style="width:170px" /></td>
+                <td><textarea class="unit-inline-input" data-idx="${idx}" data-field="name" style="width:170px">${esc(row.name || '')}</textarea></td>
                 <td><input class="unit-inline-input" data-idx="${idx}" data-field="nomenclature_code" value="${esc(row.nomenclature_code || '')}" style="width:100px" /></td>
                 <td>
                   <select class="unit-inline-select" data-idx="${idx}" data-field="unit">
