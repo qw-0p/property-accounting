@@ -131,12 +131,15 @@ export function openGridEditor({ image, grid, onApply }) {
         () => { rowLines.sort((a, b) => a - b); renderLayer() })
     })
 
-    const hb = document.createElement('div')
-    hb.className = 'ge-header-wrap'
-    hb.style.top = toPx(headerBottom) + 'px'
-    hb.innerHTML = `<div class="ge-header-line"></div><span class="ge-header-tag">заголовок / дані</span>`
-    layer.appendChild(hb)
-    dragY(hb, null, (imgY) => { headerBottom = Math.max(0, Math.min(H, imgY)); hb.style.top = toPx(headerBottom) + 'px' })
+    // Лінія «заголовок / дані» — лише якщо заголовок є (на сторінках-продовженнях header_bottom=0)
+    if (headerBottom > 0) {
+      const hb = document.createElement('div')
+      hb.className = 'ge-header-wrap'
+      hb.style.top = toPx(headerBottom) + 'px'
+      hb.innerHTML = `<div class="ge-header-line"></div><span class="ge-header-tag">заголовок / дані</span>`
+      layer.appendChild(hb)
+      dragY(hb, null, (imgY) => { headerBottom = Math.max(0, Math.min(H, imgY)); hb.style.top = toPx(headerBottom) + 'px' })
+    }
   }
 
   function render() {

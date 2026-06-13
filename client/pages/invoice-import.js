@@ -305,6 +305,12 @@ export function InvoiceImportPage() {
     }
   }
 
+  // Перечитати сторінку за сіткою q.grid (повертає нові рядки, без рендера)
+  const applyToPage = async (q, grid) => {
+    const resp = await driveApi.parseManual({ file_id: fileId, page: q.page, grid })
+    return (resp.rows || []).map(r => rowFromRecord(r, q.page))
+  }
+
   // Відкрити редактор сітки для сторінки й перечитати її за новою розміткою
   const reparsePage = (p) => {
     if (!p || !p.grid || !p.grid.image) return
@@ -312,15 +318,27 @@ export function InvoiceImportPage() {
       image: p.grid.image,
       grid: p.grid,
       onApply: async (newGrid) => {
-        p.grid = { ...p.grid, ...newGrid }
         const resultContainer = el.querySelector('#parsed-result')
         resultContainer.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ Перечитую за новою розміткою...</span>'
         try {
-          const resp = await driveApi.parseManual({ file_id: fileId, page: p.page, grid: newGrid })
-          const newRows = (resp.rows || []).map(r => rowFromRecord(r, p.page))
-          parsedRows = parsedRows.filter(r => r._page !== p.page).concat(newRows)
+          p.grid = { ...p.grid, ...newGrid }
+          const changed = { [p.page]: await applyToPage(p, newGrid) }
+
+          // Перенести РОЗМІТКУ КОЛОНОК на решту сторінок (рядки кожна визначить сама)
+          const others = pages.filter(q => q.page !== p.page && q.grid && q.grid.image)
+          if (others.length) {
+            const colsOnly = { columns: newGrid.columns } // без row_lines → авто-рядки; header_bottom=0
+            for (const q of others) {
+              changed[q.page] = await applyToPage(q, colsOnly)
+              q.grid = { ...q.grid, columns: newGrid.columns }
+            }
+          }
+
+          const changedPages = new Set(Object.keys(changed).map(Number))
+          const allNew = Object.values(changed).flat()
+          parsedRows = parsedRows.filter(r => !changedPages.has(r._page)).concat(allNew)
           parsedRows.sort((a, b) => (a._page ?? 1e9) - (b._page ?? 1e9))
-          await Promise.all(newRows.map(lookupRow))
+          await Promise.all(allNew.map(lookupRow))
           renderParsedRows(resultContainer)
         } catch (e) {
           console.error('manual reparse error:', e)

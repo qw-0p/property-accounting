@@ -133,16 +133,17 @@ def _ocr_text_conf(cell, psm=6):
     return text, mean_conf
 
 def _ocr_best_orientation(cell):
-    """Try horizontal + both 90° rotations, return text of the most confident."""
-    candidates = [_ocr_text_conf(cell, psm=6)]
-    candidates.append(_ocr_text_conf(cv2.rotate(cell, cv2.ROTATE_90_CLOCKWISE), psm=6))
-    candidates.append(_ocr_text_conf(cv2.rotate(cell, cv2.ROTATE_90_COUNTERCLOCKWISE), psm=6))
-
+    """Заголовок може бути горизонтальним АБО вертикальним (повернутим за годинниковою).
+    Пробуємо ці два варіанти й беремо впевненіший. CCW не пробуємо — на цих формах
+    він завжди дає кашу, тож це чистий виграш у швидкості без втрати якості."""
+    candidates = [
+        _ocr_text_conf(cell, psm=6),
+        _ocr_text_conf(cv2.rotate(cell, cv2.ROTATE_90_CLOCKWISE), psm=6),
+    ]
     candidates = [c for c in candidates if c[0].strip()]
     if not candidates:
         return ''
-    best = max(candidates, key=lambda c: c[1])
-    return best[0]
+    return max(candidates, key=lambda c: c[1])[0]
 
 def ocr_cell(gray, x1, y1, x2, y2, pad=4, try_vertical=False):
     x1 = max(0, x1 + pad)
@@ -171,6 +172,55 @@ def ocr_cell(gray, x1, y1, x2, y2, pad=4, try_vertical=False):
         config='--psm 6 --oem 3'
     ).strip()
     return ' '.join(text.split())
+
+def _line_sort(words):
+    """words: list of (top, left, height, text) → текст у правильному порядку рядків."""
+    if not words:
+        return ''
+    words = sorted(words, key=lambda w: (w[0], w[1]))
+    lines, cur, ref, hh = [], [words[0]], words[0][0], (words[0][2] or 10)
+    for w in words[1:]:
+        if abs(w[0] - ref) <= hh * 0.6:
+            cur.append(w)
+        else:
+            lines.append(cur); cur = [w]; ref = w[0]; hh = w[2] or hh
+    lines.append(cur)
+    out = []
+    for ln in lines:
+        out += [w[3] for w in sorted(ln, key=lambda w: w[1])]
+    return ' '.join(' '.join(out).split())
+
+def ocr_grid(gray, cells, psm=4):
+    """OCR усієї таблиці ОДНИМ викликом tesseract; слова розкладаються по
+    клітинках за координатами. Значно швидше за виклик на кожну клітинку."""
+    g = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    data = pytesseract.image_to_data(
+        g, lang='ukr+eng', config=f'--psm {psm} --oem 3',
+        output_type=pytesseract.Output.DICT,
+    )
+    buckets = [[[] for _ in row] for row in cells]
+    n = len(data['text'])
+    for i in range(n):
+        txt = data['text'][i].strip()
+        if not txt:
+            continue
+        try:
+            if float(data['conf'][i]) < 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        cx = data['left'][i] + data['width'][i] / 2
+        cy = data['top'][i] + data['height'][i] / 2
+        for r, row in enumerate(cells):
+            if not row or not (row[0][1] <= cy < row[0][3]):
+                continue
+            for c, (x1, _, x2, _) in enumerate(row):
+                if x1 <= cx < x2:
+                    buckets[r][c].append((data['top'][i], data['left'][i], data['height'][i], txt))
+                    break
+            break
+    return [[_line_sort(buckets[r][c]) for c in range(len(cells[r]))] for r in range(len(cells))]
+
 
 COLUMN_MAP = [
     {'field': 'row_no',             'keywords': ['№', 'з/п', 'п/п', 'no']},
@@ -292,12 +342,9 @@ def extract(input_bytes):
     cells = build_cells(h_pos, v_pos, img_h, img_w)
     sys.stderr.write(f"Cells: {len(cells)} rows x {max(len(r) for r in cells) if cells else 0} cols\n")
 
-    # 4. OCR кожної клітинки (горизонтально)
-    cells_text = []
-    for row in cells:
-        row_text = [ocr_cell(table_gray, *cell) for cell in row]
-        cells_text.append(row_text)
-        sys.stderr.write(f"Row: {row_text}\n")
+    # 4. OCR усієї таблиці одним проходом (швидко); по комірках — за координатами
+    cells_text = ocr_grid(table_gray, cells)
+    sys.stderr.write(f"OCR grid done: {len(cells)} rows\n")
 
     # 5. Визначаємо заголовок. На сторінках-продовженнях хедера нема —
     #    тоді використовуємо col_map, переданий з першої сторінки (env COL_MAP_JSON).
@@ -309,6 +356,15 @@ def extract(input_bytes):
         except Exception:
             provided_map = None
 
+    # Вузькі (вертикальні) комірки шапки перечитуємо: горизонталь + CW (без CCW — він завжди каша)
+    def reocr_vertical_headers(idx):
+        if not (0 <= idx < len(cells)):
+            return
+        for j, cell in enumerate(cells[idx]):
+            x1, y1, x2, y2 = cell
+            if (x2 - x1) < (y2 - y1):
+                cells_text[idx][j] = ocr_cell(table_gray, *cell, try_vertical=True)
+
     best_idx, best_score = 0, -1
     for i, row in enumerate(cells_text):
         s = header_score(row)
@@ -316,28 +372,21 @@ def extract(input_bytes):
             best_idx, best_score = i, s
 
     if best_score >= 2:
-        # На цій сторінці є власний заголовок
         header_idx = best_idx
-        # Смугу заголовків перечитуємо з обертанням — для вертикальних заголовків
-        # (рядок хедера + рядок над ним: дворівневий хедер на кшталт «Кількість»).
-        for idx in (header_idx - 1, header_idx):
-            if 0 <= idx < len(cells):
-                cells_text[idx] = [ocr_cell(table_gray, *cell, try_vertical=True) for cell in cells[idx]]
-                sys.stderr.write(f"Header row {idx} (rotated): {cells_text[idx]}\n")
+        reocr_vertical_headers(header_idx - 1)
+        reocr_vertical_headers(header_idx)
+        sys.stderr.write(f"Header rows re-OCR'd (vertical only)\n")
         col_map = map_columns(cells_text[max(0, header_idx - 1):header_idx + 2])
         data_start = header_idx + 1
     elif provided_map:
-        # Сторінка-продовження: заголовка нема, беремо мапінг з 1-ї сторінки
         header_idx = -1
         col_map = provided_map
         data_start = 0
         sys.stderr.write("No header on page; reusing provided col_map\n")
     else:
-        # Запасний варіант (як було)
         header_idx = find_header_row(cells_text)
-        for idx in (header_idx - 1, header_idx):
-            if 0 <= idx < len(cells):
-                cells_text[idx] = [ocr_cell(table_gray, *cell, try_vertical=True) for cell in cells[idx]]
+        reocr_vertical_headers(header_idx - 1)
+        reocr_vertical_headers(header_idx)
         col_map = map_columns(cells_text[max(0, header_idx - 1):header_idx + 2])
         data_start = header_idx + 1
 
@@ -418,39 +467,48 @@ def extract_manual(png_bytes, grid):
         return
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray, _, _ = find_table_region(gray)
+    img_h, img_w = gray.shape
 
     columns = grid.get('columns', [])
     row_lines = sorted(int(y) for y in grid.get('row_lines', []))
     header_bottom = int(grid.get('header_bottom', 0))
 
-    cells, cells_text, records = [], [], []
+    # Якщо рядки не задані — беремо колонки з сітки, а горизонтальні межі
+    # визначаємо авто-детекцією цієї сторінки (для перенесення розмітки на інші сторінки).
+    if not row_lines:
+        h_lines, _ = detect_lines(gray)
+        h_pos = get_line_positions(h_lines, axis=1)
+        row_lines = sorted(set([0] + [int(p) for p in h_pos] + [int(img_h)]))
+
+    cells, records = [], []
     stop_keywords = ['всього', 'разом', 'підпис', 'матеріально', 'здав', 'прийняв']
     col_map = {j: c.get('field') for j, c in enumerate(columns) if c.get('field')}
 
+    # Будуємо клітинки за заданою сіткою (рядки нижче межі «заголовок/дані»)
+    band_idx = []
     for r in range(len(row_lines) - 1):
         y1, y2 = row_lines[r], row_lines[r + 1]
         if y2 - y1 < 8:
             continue
-        # Смуги вище межі «заголовок/дані» — не дані
         if (y1 + y2) / 2 < header_bottom:
             continue
-        row_cells, row_text, record = [], [], {}
-        for col in columns:
-            x1, x2 = int(col['x1']), int(col['x2'])
+        cells.append([(int(c['x1']), y1, int(c['x2']), y2) for c in columns])
+        band_idx.append(r)
+
+    # OCR одним проходом
+    cells_text = ocr_grid(gray, cells) if cells else []
+
+    for row_text in cells_text:
+        record = {}
+        for j, col in enumerate(columns):
             field = col.get('field')
-            txt = ocr_cell(gray, x1, y1, x2, y2)
-            row_cells.append((x1, y1, x2, y2))
-            row_text.append(txt)
+            txt = row_text[j] if j < len(row_text) else ''
             if field and field != 'row_no' and txt.strip():
                 record[field] = txt.strip()
-
-        cells.append(row_cells)
-        cells_text.append(row_text)
 
         joined = ' '.join(row_text).lower()
         if any(k in joined for k in stop_keywords):
             continue
-        # Рядок-нумерація колонок: у комірці «назви» коротке число, або всі — короткі числа
         name_idx = next((j for j, f in col_map.items() if f == 'name'), None)
         name_cell = row_text[name_idx].strip() if (name_idx is not None and name_idx < len(row_text)) else ''
         nonempty = [c.strip() for c in row_text if c.strip()]
