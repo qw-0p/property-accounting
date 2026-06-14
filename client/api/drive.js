@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:3000'
+const BASE_URL = ''
 
 const refreshToken = async () => {
   const refresh_token = localStorage.getItem('google_refresh_token')
