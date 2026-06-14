@@ -33,6 +33,7 @@ services:
       RAPORT_FOLDER_ID: ${RAPORT_FOLDER_ID}
       EXTRACT_FOLDER_ID: ${EXTRACT_FOLDER_ID}
       INVOICE_FOLDER_ID: ${INVOICE_FOLDER_ID}
+      APP_URL: ${APP_URL}
 
 volumes:
   pgdata:

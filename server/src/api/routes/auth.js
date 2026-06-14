@@ -30,7 +30,7 @@ router.get('/google/callback', async (req, res) => {
     refresh_token: tokens.refresh_token || '',
   })
 
-  res.redirect(`http://localhost:8080/#/auth/callback?${params}`)
+  res.redirect(`${process.env.APP_URL}/#/auth/callback?${params}`)
 })
 
 router.post('/refresh', async (req, res, next) => {
