@@ -24,7 +24,7 @@ router.get('/files', async (req, res, next) => {
     const { data } = await drive.files.list({
       q: query,
       fields: 'files(id, name, mimeType, webViewLink)',
-      pageSize: 50,
+      pageSize: 1000,
     })
 
     res.json(data.files)
