@@ -31,6 +31,12 @@ app.get('/health', async (req, res) => {
 
 const PORT = process.env.PORT || 3000
 
+const path = require('path')
+app.use(express.static(path.join(__dirname, '../../client')))
+app.use((err, req, res, next) => {
+  res.status(err.status || 500).json({ message: err.message || 'Internal error' })
+})
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
