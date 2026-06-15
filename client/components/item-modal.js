@@ -82,7 +82,7 @@ export const openModal = (id = null, ctx = {}) => {
         <div style="font-weight:600;margin-bottom:6px">⚠️ Можливий дубль</div>
         <div>Уже є схоже майно:</div>
         <ul style="margin:6px 0 10px 18px">
-          ${matches.map(m => `<li>${esc(m.name)} / КН: ${esc(m.nomenclature_code || '—')} / ${m.price ?? '—'}${m.service_name ? ` (${esc(m.service_name)})` : ''}</li>`).join('')}
+          ${matches.map((m, i) => `<li data-idx="${i}">${esc(m.name)} / КН: ${esc(m.nomenclature_code || '—')} / ${m.price ?? '—'}${m.service_name ? ` (${esc(m.service_name)})` : ''}${item ? ` <button class="btn-ghost dup-merge-btn" data-idx="${i}" style="padding:2px 8px;font-size:12px;color:#b45309">Об'єднати →</button>` : ''}</li>`).join('')}
         </ul>
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" id="dup-cancel">Скасувати</button>
@@ -92,6 +92,15 @@ export const openModal = (id = null, ctx = {}) => {
     `
     box.querySelector('#dup-cancel').onclick = () => { box.style.display = 'none'; box.innerHTML = '' }
     box.querySelector('#dup-force').onclick = () => doSave(true)
+    box.querySelectorAll('.dup-merge-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const target = matches[parseInt(btn.dataset.idx)]
+        if (!confirm(`Перемістити всі одиниці з «${item.name}» до «${target.name}» і видалити поточний?`)) return
+        await itemsApi.merge(item.id, target.id)
+        close()
+        load()
+      }
+    })
   }
 
   const doSave = async (skipDupCheck = false) => {

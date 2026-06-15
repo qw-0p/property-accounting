@@ -31,6 +31,12 @@ router.patch('/:id', async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+router.post('/:id/merge/:targetId', async (req, res, next) => {
+  try {
+    res.json(await service.merge(req.params.id, req.params.targetId))
+  } catch (e) { next(e) }
+})
+
 router.delete('/:id', async (req, res, next) => {
   try {
     res.json(await service.remove(req.params.id))

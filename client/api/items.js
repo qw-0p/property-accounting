@@ -34,6 +34,10 @@ export const itemsApi = {
     })
     return res.json()
   },
+  merge: async (id, targetId) => {
+    const res = await fetch(`${BASE_URL}/items/${id}/merge/${targetId}`, { method: 'POST' })
+    return res.json()
+  },
   remove: async (id) => {
     const res = await fetch(`${BASE_URL}/items/${id}`, {
       method: 'DELETE',
