@@ -76,7 +76,9 @@ const findMatches = async (name, code) => {
     FROM items i
     LEFT JOIN units_of_measure uom ON uom.id = i.unit_of_measure_id
     LEFT JOIN services s ON s.id = i.service_id
-    WHERE ($1::text IS NOT NULL AND lower(trim(i.name)) = lower(trim($1)))
+    WHERE ($1::text IS NOT NULL AND
+        translate(lower(trim(i.name)), 'aceiopxhbkmt', 'асеіорхрнвкмт') =
+        translate(lower(trim($1)),     'aceiopxhbkmt', 'асеіорхрнвкмт'))
        OR ($2::text IS NOT NULL AND $2 <> '' AND i.nomenclature_code = $2)`,
     [name || null, code || null]
   )
@@ -119,6 +121,10 @@ const update = async (id, data) => {
   return rows[0]
 }
 
+const reassignUnits = async (fromId, toId) => {
+  await pool.query('UPDATE units SET item_id = $1 WHERE item_id = $2', [toId, fromId])
+}
+
 const remove = async (id) => {
   const { rows } = await pool.query(
     'DELETE FROM items WHERE id = $1 RETURNING *',
@@ -127,4 +133,4 @@ const remove = async (id) => {
   return rows[0]
 }
 
-module.exports = { getAll, getById, findMatches, create, update, remove }
+module.exports = { getAll, getById, findMatches, create, update, remove, reassignUnits }

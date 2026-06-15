@@ -21,6 +21,9 @@ const getById = async (id) => {
 
 const toNum = (v) => (v === null || v === undefined || v === '') ? null : Number(v)
 
+const LAT_MAP = { a: 'а', c: 'с', e: 'е', i: 'і', o: 'о', p: 'р', x: 'х', h: 'н', b: 'в', k: 'к', m: 'м', t: 'т' }
+const normName = (s) => (s || '').trim().toLowerCase().replace(/[aceioprxhbkmt]/g, ch => LAT_MAP[ch] ?? ch)
+
 // Ціна — частина ідентичності item. Різна ціна = різний item.
 const priceEq = (a, b) => {
   const x = toNum(a), y = toNum(b)
@@ -38,7 +41,7 @@ const priceEq = (a, b) => {
 //  - частковий збіг (лише назва АБО лише код) → conflict (matchedOn: 'name' | 'code')
 const lookup = async ({ name, nomenclature_code, price }) => {
   const candidates = await dal.findMatches(name, nomenclature_code)
-  const nm = (name || '').trim().toLowerCase()
+  const nm = normName(name)
   const cd = (nomenclature_code || '').trim()
   const pin = toNum(price)
 
@@ -47,7 +50,7 @@ const lookup = async ({ name, nomenclature_code, price }) => {
   const strongMatches = [] // збіг назва+КН (для випадку порожньої ціни)
 
   for (const it of candidates) {
-    const inm = (it.name || '').trim().toLowerCase()
+    const inm = normName(it.name)
     const icd = (it.nomenclature_code || '').trim()
     const nameEq = !!nm && inm === nm
     const codeEq = !!cd && icd === cd
@@ -85,10 +88,17 @@ const update = async (id, data) => {
   return item
 }
 
+const merge = async (id, targetId) => {
+  if (String(id) === String(targetId)) throw { status: 400, message: 'Cannot merge item with itself' }
+  await dal.reassignUnits(id, targetId)
+  await dal.remove(id)
+  return dal.getById(targetId)
+}
+
 const remove = async (id) => {
   const item = await dal.remove(id)
   if (!item) throw { status: 404, message: 'Item not found' }
   return item
 }
 
-module.exports = { getAll, getById, lookup, create, update, remove }
+module.exports = { getAll, getById, lookup, create, update, remove, merge }
