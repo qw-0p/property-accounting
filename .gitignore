@@ -1,6 +1,7 @@
 node_modules
 
 *.env
+*.env.dev
 
 /generated/prisma
 
@@ -11,3 +12,5 @@ node_modules
 .DS_Store
 
 *.pdf
+
+docker-compose.override.yml
